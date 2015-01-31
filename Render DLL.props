@@ -1,0 +1,48 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+    <OutDir>$(SolutionDir)\_work\bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\_work\intermediate\$(Configuration)\$(ProjectName)\</IntDir>
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>../games/$(GAMENAME)/render/inc;../games/$(GAMENAME)/engine/inc;../games/$(GAMENAME)/core/inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>PROJECTNAME=L"RENDER11";_REALLY_WANT_DEBUG;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <StructMemberAlignment>4Bytes</StructMemberAlignment>
+      <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
+      <DisableSpecificWarnings>4291;4373</DisableSpecificWarnings>
+      <WarningLevel>Level4</WarningLevel>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <CompileAsManaged>false</CompileAsManaged>
+      <CompileAsWinRT>false</CompileAsWinRT>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>../games/$(GAMENAME)/render/lib/render.lib;../games/$(GAMENAME)/engine/lib/engine.lib;../games/$(GAMENAME)/core/lib/core.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>mkdir "$(GAMEDIR)\system\$(ProjectName)"
+copy "$(ProjectDir)*.hlsl" "$(GAMEDIR)\system\$(ProjectName)"
+copy "$(ProjectDir)*.hlsli" "$(GAMEDIR)\system\$(ProjectName)"
+copy "$(ProjectDir)*.png" "$(GAMEDIR)\system\$(ProjectName)"
+copy "$(TargetPath) " "$(GAMEDIR)\system\"
+
+mkdir "$(SolutionDir)\packages\$(GAMENAME)"
+mkdir "$(SolutionDir)\packages\$(GAMENAME)\$(ProjectName)"
+copy "$(ProjectDir)*.hlsl" "$(SolutionDir)\packages\$(GAMENAME)\$(ProjectName)"
+copy "$(ProjectDir)*.hlsli" "$(SolutionDir)\packages\$(GAMENAME)\$(ProjectName)"
+copy "$(ProjectDir)*.png" "$(SolutionDir)\packages\$(GAMENAME)\$(ProjectName)"
+copy "$(ProjectDir)\$(ProjectName).int" "$(SolutionDir)\packages\$(GAMENAME)"
+copy "$(TargetPath)"  "$(SolutionDir)\packages\$(GAMENAME)"
+</Command>
+    </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+</Project>
