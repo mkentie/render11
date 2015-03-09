@@ -3,6 +3,7 @@
 #include "GlobalShaderConstants.h"
 
 #include "TileRenderer.h" //Can't forward declare as DECLARE_CLASS implements destructor
+#include "GouraudRenderer.h"
 #include "DeviceState.h"
 #include "TextureCache.h"
 
@@ -22,10 +23,21 @@ public:
 protected:
     void Render();
 
+    //Convenience function so don't need to pass Viewport->...; template to pass varargs
+
+    template<class... Args>
+    void PrintFunc(Args... args)
+    {
+        assert(Viewport);
+        assert(Viewport->Canvas);
+        Viewport->Canvas->WrappedPrintf(Viewport->Canvas->SmallFont, 0, args...);
+    }
+
     RenDevBackend m_Backend;
     std::unique_ptr<GlobalShaderConstants> m_pGlobalShaderConstants;
     std::unique_ptr<DeviceState> m_pDeviceState;
     std::unique_ptr<TileRenderer> m_pTileRenderer;
+    std::unique_ptr<GouraudRenderer> m_pGouraudRenderer;
     std::unique_ptr<TextureCache> m_pTextureCache;
 
     bool m_bNoTilesDrawnYet;
@@ -52,6 +64,7 @@ public:
     pResult is a 128 character string.
     */
     virtual void GetStats(TCHAR* const pResult) override;
+
     virtual void ReadPixels(FColor* const pPixels) override;
 
     //virtual void EndFlash() override

@@ -18,7 +18,7 @@ public:
 // 	UBOOL Exec(const TCHAR* Cmd, FOutputDevice& Ar) override;
     virtual void PreRender(FSceneNode* Frame) override;
 // 	virtual void PostRender(FSceneNode* Frame) override;
-// 	virtual FSceneNode* CreateMasterFrame(UViewport* Viewport, FVector Location, FRotator Rotation, FScreenBounds* Bounds) override;
+    virtual FSceneNode* CreateMasterFrame(UViewport* Viewport, FVector Location, FRotator Rotation, FScreenBounds* Bounds) override;
 // 	virtual FSceneNode* CreateChildFrame(FSceneNode* Parent, FSpanBuffer* Span, ULevel* Level, INT iSurf, INT iZone, FLOAT Mirror, const FPlane& NearClip, const FCoords& Coords, FScreenBounds* Bounds) override;
 // 	virtual void FinishMasterFrame() override;
 //virtual void DrawWorld(FSceneNode* Frame) override;

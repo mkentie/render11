@@ -3,9 +3,6 @@
 
 GlobalShaderConstants::GlobalShaderConstants(ID3D11Device& Device, ID3D11DeviceContext& DeviceContext)
 :m_CBufPerFrame(Device, DeviceContext)
-,m_fFov(0.0)
-,m_iViewPortX(0)
-,m_iViewPortY(0)
 {
 
 }
@@ -15,7 +12,7 @@ void GlobalShaderConstants::SetSceneNode(const FSceneNode& SceneNode)
     assert(SceneNode.Viewport);
     assert(SceneNode.Viewport->Actor);
     assert(reinterpret_cast<uintptr_t>(&m_CBufPerFrame.m_Data.ProjectionMatrix) % 16 == 0);
-    
+
     //TODO: we don't need any of the SceneNode precalculated values, so remove calculation from render.dll
     if (SceneNode.Viewport->Actor->FovAngle == m_fFov && SceneNode.X == m_iViewPortX && SceneNode.Y == m_iViewPortY)
     {
@@ -31,7 +28,10 @@ void GlobalShaderConstants::SetSceneNode(const FSceneNode& SceneNode)
 
     m_CBufPerFrame.m_Data.fRes[0] = SceneNode.FX;
     m_CBufPerFrame.m_Data.fRes[1] = SceneNode.FY;
+    m_CBufPerFrame.m_Data.fRes[2] = 1.0f/SceneNode.FX;
+    m_CBufPerFrame.m_Data.fRes[3] = 1.0f/SceneNode.FY;
     m_CBufPerFrame.m_Data.ProjectionMatrix = DirectX::XMMatrixPerspectiveFovLH(fFovVert, fAspect, fZNear, fZFar);
+    m_CBufPerFrame.m_Data.ProjectionMatrix.r[1].m128_f32[1] *= -1.0f; //Flip Y
 
     m_CBufPerFrame.MarkAsDirty();
     m_fFov = SceneNode.Viewport->Actor->FovAngle;

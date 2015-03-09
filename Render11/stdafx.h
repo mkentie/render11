@@ -15,8 +15,10 @@ using Microsoft::WRL::ComPtr;
 #include <cstdio>
 #include <memory>
 #include <unordered_map>
+#include <map>
 #include <string>
 #include <array>
+#include <functional>
 
 #include <Engine.h>
 #include <RenderPrivate.h>

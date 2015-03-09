@@ -32,8 +32,8 @@ void TextureConverter::FormatConverterP8::Convert(const FTextureInfo& Texture)
 
     FColor* const Palette = Texture.Palette;
 
-    //Palette color 0 is the alpha mask color, we always give it alpha 0
-    Palette[0].A = 0;
+    //Palette color 0 is the alpha mask color, we always give it alpha 0 and make it look black
+    Palette[0].R = Palette[0].G = Palette[0].B = Palette[0].A = 0;
 
     m_Buffer.Resize(Texture, *this);
     for (INT i = 0; i < Texture.NumMips; i++)
@@ -108,7 +108,7 @@ TextureConverter::TextureConverter(ID3D11Device& Device, ID3D11DeviceContext& De
 
     D3D11_SHADER_RESOURCE_VIEW_DESC ShaderResourceViewDesc;
     ShaderResourceViewDesc.Format = TextureDesc.Format;
-    ShaderResourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION::D3D10_1_SRV_DIMENSION_TEXTURE2D;
+    ShaderResourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION::D3D11_SRV_DIMENSION_TEXTURE2D;
     ShaderResourceViewDesc.Texture2D.MipLevels = 1;
     ShaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
 
@@ -146,12 +146,16 @@ TextureConverter::TextureData TextureConverter::Convert(const FTextureInfo& Text
 
     D3D11_SHADER_RESOURCE_VIEW_DESC ShaderResourceViewDesc;
     ShaderResourceViewDesc.Format = TextureDesc.Format;
-    ShaderResourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION::D3D10_1_SRV_DIMENSION_TEXTURE2D;
+    ShaderResourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION::D3D11_SRV_DIMENSION_TEXTURE2D;
     ShaderResourceViewDesc.Texture2D.MipLevels = Texture.NumMips;
     ShaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
 
     ThrowIfFail(m_Device.CreateShaderResourceView(OutputTexture.pTexture.Get(), &ShaderResourceViewDesc, &OutputTexture.pShaderResourceView), L"Failed to create SRV for '%s'.", Texture.Texture->GetName());
     SetResourceNameW(OutputTexture.pShaderResourceView, Texture.Texture->GetName());
+
+    //Set params
+    OutputTexture.fMultU = Texture.UScale / Texture.USize;
+    OutputTexture.fMultV = Texture.VScale / Texture.VSize;
 
     return OutputTexture;
 }

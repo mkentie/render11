@@ -78,6 +78,9 @@
     <ClInclude Include="DynamicBuffer.h">
       <Filter>_Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="GouraudRenderer.h">
+      <Filter>_Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="URender11.cpp">
@@ -110,13 +113,21 @@
     <ClCompile Include="TextureConverter.cpp">
       <Filter>Render\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="GouraudRenderer.cpp">
+      <Filter>_Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="Tile.hlsl">
+    <FxCompile Include="Gouraud.hlsl">
       <Filter>Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="Render11.hlsli">
+    </FxCompile>
+    <FxCompile Include="Tile.hlsl">
       <Filter>Shaders</Filter>
-    </CustomBuild>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Render11.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

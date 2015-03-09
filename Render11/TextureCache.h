@@ -10,8 +10,8 @@ public:
     TextureCache(const TextureCache&) = delete;
     TextureCache& operator=(const TextureCache&) = delete;
 
-    const TextureConverter::TextureData* FindOrInsert(const FTextureInfo& Texture);
-    const TextureConverter::TextureData* FindOrInsertAndPrepare(const FTextureInfo& Texture, const unsigned int iSlot);
+    const TextureConverter::TextureData& FindOrInsert(const FTextureInfo& Texture);
+    const TextureConverter::TextureData& FindOrInsertAndPrepare(const FTextureInfo& Texture, const unsigned int iSlot);
 
     /**
     Instead of checking what's actually bound, for our purposes it's enough to just check if someone else WANTED to bind something else.
@@ -23,7 +23,8 @@ public:
     void Flush();
 
     size_t GetNumTextures() const { return m_Textures.size(); }
-    void PrintSizeHistogram() const;
+
+    void PrintSizeHistogram(UCanvas& c) const;
 
 protected:
     void ResetDirtySlots();

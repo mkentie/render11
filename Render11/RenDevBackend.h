@@ -27,8 +27,11 @@ protected:
     ComPtr<IDXGIAdapter1> m_pAdapter;
     ComPtr<ID3D11Device> m_pDevice;
     ComPtr<ID3D11DeviceContext> m_pDeviceContext;
+
     ComPtr<IDXGISwapChain> m_pSwapChain;
     ComPtr<ID3D11RenderTargetView> m_pBackBufferRTV;
+    ComPtr<ID3D11DepthStencilView> m_pDepthStencilView;
+
 
     DXGI_SWAP_CHAIN_DESC m_SwapChainDesc;
 };

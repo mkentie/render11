@@ -7,7 +7,6 @@ TileRenderer::TileRenderer(ID3D11Device& Device, ID3D11DeviceContext& DeviceCont
 :m_Device(Device)
 ,m_DeviceContext(DeviceContext)
 ,m_InstanceBuffer(Device, DeviceContext, 4096)
-,m_iNumDraws(0)
 {
     ShaderCompiler Compiler(m_Device, L"Render11\\Tile.hlsl");
     m_pVertexShader = Compiler.CompileVertexShader();
@@ -17,7 +16,7 @@ TileRenderer::TileRenderer(ID3D11Device& Device, ID3D11DeviceContext& DeviceCont
         {"Position", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1},
         {"TexCoord", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1},
         {"TexCoord", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1},
-        {"BlendIndices", 0, DXGI_FORMAT_R8_UINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1}
+        {"BlendIndices", 0, DXGI_FORMAT_R32_UINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1}
     };
 
     m_pInputLayout = Compiler.CreateInputLayout(InputElementDescs, _countof(InputElementDescs));
@@ -37,7 +36,7 @@ void TileRenderer::Bind()
     assert(m_pVertexShader);
     assert(m_pPixelShader);
 
-    m_DeviceContext.IASetPrimitiveTopology(sm_PrimitiveTopology);
+    m_DeviceContext.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
     m_DeviceContext.IASetInputLayout(m_pInputLayout.Get());
 
     const UINT Strides[] = {sizeof(Tile)};
@@ -57,5 +56,5 @@ void TileRenderer::Draw()
 
 TileRenderer::Tile& TileRenderer::GetTile()
 {
-    return m_InstanceBuffer.GetElement();
+    return m_InstanceBuffer.PushBack();
 }

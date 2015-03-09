@@ -10,36 +10,31 @@ TextureCache::TextureCache(ID3D11Device& Device, ID3D11DeviceContext& DeviceCont
     ResetDirtySlots();
 }
 
-const TextureConverter::TextureData* TextureCache::FindOrInsert(const FTextureInfo& Texture)
+const TextureConverter::TextureData& TextureCache::FindOrInsert(const FTextureInfo& Texture)
 {
     const auto it = m_Textures.find(Texture.CacheID);
     if (it != m_Textures.cend())
     {
-        return &it->second;
+        return it->second;
     }
 
     TextureConverter::TextureData NewData = m_TextureConverter.Convert(Texture);
-    const TextureConverter::TextureData* const p = &m_Textures.insert(std::make_pair(Texture.CacheID, std::move(NewData))).first->second;
-    assert(p);
+    const TextureConverter::TextureData& Data = m_Textures.emplace(Texture.CacheID, std::move(NewData)).first->second;
 
-    return p;
+    return Data;
 }
 
 
-const TextureConverter::TextureData* TextureCache::FindOrInsertAndPrepare(const FTextureInfo& Texture, const size_t iSlot)
+const TextureConverter::TextureData& TextureCache::FindOrInsertAndPrepare(const FTextureInfo& Texture, const size_t iSlot)
 {
-    const TextureConverter::TextureData* const pData = FindOrInsert(Texture);
-    if (!pData)
-    {
-        return nullptr;
-    }
+    const TextureConverter::TextureData& Data = FindOrInsert(Texture);
 
     m_iDirtyBeginSlot = std::min(m_iDirtyBeginSlot, iSlot);
     m_iDirtyEndSlot = std::max(m_iDirtyEndSlot, iSlot);
-    m_PreparedSRVs[iSlot] = pData->pShaderResourceView.Get();
+    m_PreparedSRVs[iSlot] = Data.pShaderResourceView.Get();
     m_PreparedIds[iSlot] = Texture.CacheID;
 
-    return pData;
+    return Data;
 }
 
 void TextureCache::BindTextures()
@@ -68,13 +63,24 @@ void TextureCache::ResetDirtySlots()
     m_iDirtyEndSlot = 0;
 }
 
-void TextureCache::PrintSizeHistogram() const
+void TextureCache::PrintSizeHistogram(UCanvas& c) const
 {
+    typedef decltype(D3D11_TEXTURE2D_DESC::Width) st;
+    std::map<st, std::map<st, size_t>> Histogram;
     for (const auto& t : m_Textures)
     {
         D3D11_TEXTURE2D_DESC Desc;
         t.second.pTexture->GetDesc(&Desc);
-        LOGMESSAGEF(L"%u x %u", Desc.Width, Desc.Height);
+
+        auto it = Histogram.emplace(Desc.Width, std::map<st, size_t>()).first;
+        auto it2 = it->second.emplace(Desc.Height, 0).first;
+        it2->second++;
+    }
+    for (const auto& Width : Histogram)
+    {
+        for (const auto& Height : Width.second)
+        {
+            c.WrappedPrintf(c.SmallFont, 0, L"%u x %u : %Iu", Width.first, Height.first, Height.second);
+        }
     }
 }
-

@@ -23,8 +23,8 @@ protected:
     ConstantBuffer<PerFrame> m_CBufPerFrame;
 
     //Vars for projection change check
-    float m_fFov;
-    int m_iViewPortX;
-    int m_iViewPortY;
+    float m_fFov = 0.0f;
+    int m_iViewPortX = 0;
+    int m_iViewPortY = 0;
 };
 

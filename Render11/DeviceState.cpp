@@ -1,14 +1,10 @@
 #include "stdafx.h"
 #include "DeviceState.h"
 #include "Helpers.h"
-#include "PolyFlags.h"
 
 DeviceState::DeviceState(ID3D11Device& Device, ID3D11DeviceContext& DeviceContext)
 :m_Device(Device)
 ,m_DeviceContext(DeviceContext)
-,m_PreparedRasterizerState(RASTERIZER_STATE::DEFAULT)
-,m_PreparedDepthStencilState(DEPTH_STENCIL_STATE::DEFAULT)
-,m_PreparedBlendState(BLEND_STATE::DEFAULT)
 {
     CreateRasterizerStates();
     CreateDepthStencilStates();
@@ -164,11 +160,23 @@ void DeviceState::BindSamplerStates() const
 void DeviceState::Bind() const
 {
     m_DeviceContext.OMSetBlendState(m_BlendStates[static_cast<size_t>(m_PreparedBlendState)].Get(), nullptr, 0xffffffff);
+    m_DeviceContext.RSSetState(m_RasterizerStates[0].Get()); //todo
+    m_DeviceContext.OMSetDepthStencilState(m_DepthStencilStates[static_cast<size_t>(m_PreparedDepthStencilState)].Get(), 0xffffffff);
+}
+
+DeviceState::DEPTH_STENCIL_STATE DeviceState::GetDepthStencilStateForPolyFlags(const DWORD PolyFlags) const
+{
+    DEPTH_STENCIL_STATE NewDepthStencilState = DEPTH_STENCIL_STATE::DEFAULT;
+    if (PolyFlags & PF_NoOcclude && !(PolyFlags & PF_NoOcclude))
+    {
+        NewDepthStencilState = DEPTH_STENCIL_STATE::NO_WRITE;
+    }
+    return NewDepthStencilState;
 }
 
 DeviceState::BLEND_STATE DeviceState::GetBlendStateForPolyFlags(const DWORD PolyFlags) const
 {
-    static const unsigned int BlendFlags = PF_Translucent | PF_Modulated | PF_Invisible | PF_AlphaBlend;
+    static const unsigned int BlendFlags = PF_Translucent | PF_Modulated | PF_Invisible /*| PF_AlphaBlend*/;
 
     BLEND_STATE NewBlendState = BLEND_STATE::DEFAULT;
     if (PolyFlags & BlendFlags)
@@ -186,10 +194,10 @@ DeviceState::BLEND_STATE DeviceState::GetBlendStateForPolyFlags(const DWORD Poly
         {
             NewBlendState = BLEND_STATE::INVIS;
         }
-        else if (PolyFlags & PF_AlphaBlend)
-        {
-            NewBlendState = BLEND_STATE::ALPHABLEND;
-        }
+//         else if (PolyFlags & PF_AlphaBlend)
+//         {
+//             NewBlendState = BLEND_STATE::ALPHABLEND;
+//         }
         else
         {
             assert(false);

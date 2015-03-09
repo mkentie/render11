@@ -2,19 +2,19 @@
 
 #include "Helpers.h"
 
-template<class T>
+template<class T, D3D11_BIND_FLAG BindFlag>
 class DynamicGPUBuffer
 {
 public:
-    explicit DynamicGPUBuffer(ID3D11Device& Device, ID3D11DeviceContext& DeviceContext, const unsigned int iReserve)
+    explicit DynamicGPUBuffer(ID3D11Device& Device, ID3D11DeviceContext& DeviceContext, const size_t iReserve)
     :m_Device(Device)
     ,m_DeviceContext(DeviceContext)
     ,m_Mapping()
-    ,m_iReserved(iReserve)
+    ,m_iReserved(0)
     ,m_iSize(0)
     ,m_iMapStart(0)
     {
-        Grow();
+        Alloc(iReserve);
     }
 
     DynamicGPUBuffer(const DynamicGPUBuffer&) = delete;
@@ -28,22 +28,22 @@ public:
         m_iSize = 0;
     }
 
-    unsigned int GetSize() const
+    size_t GetSize() const
     {
         return m_iSize;
     }
 
-    unsigned int GetMaxSize() const
+    size_t GetReserved() const
     {
         return m_iReserved;
     }
 
-    unsigned int GetNumNewElements() const
+    size_t GetNumNewElements() const
     {
         return m_iSize - m_iMapStart;
     }
 
-    unsigned int GetFirstNewElementIndex() const
+    size_t GetFirstNewElementIndex() const
     {
         return m_iMapStart;
     }
@@ -65,38 +65,6 @@ public:
         return m_Mapping.pData != nullptr;
     }
 
-    void Grow()
-    {
-        ComPtr<ID3D11Buffer> pOldBuffer(std::move(m_pBuffer));
-        if (pOldBuffer)
-        {
-            assert(m_iSize == m_iReserved);
-            m_iReserved *= 2;
-        }
-
-        D3D11_BUFFER_DESC Desc;
-        Desc.ByteWidth = sizeof(T) * m_iReserved;
-        Desc.Usage = D3D11_USAGE::D3D11_USAGE_DYNAMIC;
-        Desc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER;
-        Desc.CPUAccessFlags = D3D11_CPU_ACCESS_FLAG::D3D11_CPU_ACCESS_WRITE;
-        Desc.MiscFlags = 0;
-
-        ThrowIfFail(m_Device.CreateBuffer(&Desc, nullptr, &m_pBuffer), L"Failed to create buffer %s.", typeid(T).name());
-        SetResourceName(m_pBuffer, typeid(T).name());
-
-        if (pOldBuffer)
-        {
-            D3D11_BOX Box;
-            Box.left = 0;
-            Box.right = m_iSize * sizeof(T);
-            Box.top = 0;
-            Box.bottom = 1 * sizeof(T);
-            Box.front = 0;
-            Box.back = 1 * sizeof(T);
-            m_DeviceContext.CopySubresourceRegion(m_pBuffer.Get(), 0, 0, 0, 0, pOldBuffer.Get(), 0, &Box);
-        }
-    }
-
     void Map()
     {
         MapInternal();
@@ -110,16 +78,30 @@ public:
         m_Mapping.pData = nullptr; //For IsMapped()
     }
 
-    T& GetElement()
+    void Reserve(const size_t iReserve)
     {
         assert(IsMapped());
-        if (m_iSize == m_iReserved)
+        if (m_iReserved < iReserve)
         {
             Unmap();
-            Grow();
+            Grow(iReserve * 2);
             MapInternal();
         }
-        return static_cast<T*>(m_Mapping.pData)[m_iSize++];
+    }
+
+    T* PushBack(const size_t iSize)
+    {
+        assert(IsMapped());
+        const size_t iNewSize = m_iSize + iSize;
+        Reserve(iNewSize);
+        auto* const p = &static_cast<T*>(m_Mapping.pData)[m_iSize];
+        m_iSize = iNewSize;
+        return p;
+    }
+
+    T& PushBack()
+    {
+        return *PushBack(1);
     }
 
 
@@ -133,13 +115,47 @@ protected:
         m_DeviceContext.Map(m_pBuffer.Get(), 0, m_iSize == 0 ? D3D11_MAP::D3D11_MAP_WRITE_DISCARD : D3D11_MAP::D3D11_MAP_WRITE_NO_OVERWRITE, 0, &m_Mapping);
     }
 
+
+    void Grow(const size_t iAmount)
+    {
+        assert(m_pBuffer);
+        assert(m_iSize + iAmount > m_iReserved);
+        ComPtr<ID3D11Buffer> pOldBuffer(std::move(m_pBuffer));
+
+        Alloc(iAmount);
+
+        D3D11_BOX Box;
+        Box.left = 0;
+        Box.right = m_iSize * sizeof(T);
+        Box.top = 0;
+        Box.bottom = 1;
+        Box.front = 0;
+        Box.back = 1;
+        m_DeviceContext.CopySubresourceRegion(m_pBuffer.Get(), 0, 0, 0, 0, pOldBuffer.Get(), 0, &Box); //Todo: 11.2 D3D11_COPY_DISCARD
+    }
+
+    void Alloc(const size_t iSize)
+    {
+        D3D11_BUFFER_DESC Desc;
+        Desc.ByteWidth = sizeof(T) * iSize;
+        Desc.Usage = D3D11_USAGE::D3D11_USAGE_DYNAMIC;
+        Desc.BindFlags = BindFlag;
+        Desc.CPUAccessFlags = D3D11_CPU_ACCESS_FLAG::D3D11_CPU_ACCESS_WRITE;
+        Desc.MiscFlags = 0;
+
+        ThrowIfFail(m_Device.CreateBuffer(&Desc, nullptr, &m_pBuffer), L"Failed to create buffer %s.", typeid(T).name());
+        SetResourceName(m_pBuffer, typeid(T).name());
+
+        m_iReserved = iSize;
+    }
+
     ID3D11Device& m_Device;
     ID3D11DeviceContext& m_DeviceContext;
 
     ComPtr<ID3D11Buffer> m_pBuffer;
     D3D11_MAPPED_SUBRESOURCE m_Mapping;
 
-    unsigned int m_iReserved;
-    unsigned int m_iSize;
-    unsigned int m_iMapStart; //!< Start index of current Map() call, so users know which data to draw
+    size_t m_iReserved;
+    size_t m_iSize;
+    size_t m_iMapStart; //!< Start index of current Map() call, so users know which data to draw
 };

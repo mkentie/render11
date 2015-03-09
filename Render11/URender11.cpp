@@ -54,37 +54,41 @@ void URender11::PreRender( FSceneNode* Frame )
 // {
 // 
 // }
-// 
-// FSceneNode* URender11::CreateMasterFrame( UViewport* Viewport, FVector Location, FRotator Rotation, FScreenBounds* Bounds )
-// {
-// 	// Set base info.
-// 	FSceneNode* pFrame	= new FSceneNode;
-// 	pFrame->Viewport	= Viewport;
-// 	pFrame->Level		= Viewport->Actor->XLevel;
-// 	pFrame->Parent		= nullptr;
-// 	pFrame->Sibling		= nullptr;
-// 	pFrame->iSurf		= INDEX_NONE;
-// 	pFrame->Recursion	= 0;
-// 	pFrame->Mirror		= 1.0;
-// 	pFrame->NearClip	= FPlane(0,0,0,0);
-// 	pFrame->Span		= nullptr;
-// 	pFrame->Draw[0]		= nullptr;
-// 	pFrame->Draw[1]		= nullptr;
-// 	pFrame->Draw[2]		= nullptr;
-// 	pFrame->Sprite		= nullptr;
-// 	pFrame->X			= Viewport->SizeX;
-// 	pFrame->Y			= Viewport->SizeY;
-// 	pFrame->XB			= 0;
-// 	pFrame->YB			= 0;
-// 
-// 	// Fills in precomputed members
-// 	pFrame->ComputeRenderCoords( Location, Rotation );
-// 
-// 	pFrame->ZoneNumber = Viewport->Actor->XLevel->Model->PointRegion( Viewport->Actor->XLevel->GetLevelInfo(), pFrame->Coords.Origin ).ZoneNumber;
-// 
-// 	return pFrame;
-// }
-// 
+
+FSceneNode* URender11::CreateMasterFrame( UViewport* Viewport, FVector Location, FRotator Rotation, FScreenBounds* Bounds )
+{
+    // Set base info.
+    FSceneNode* Frame = new(GSceneMem)FSceneNode;
+    Frame->Viewport = Viewport;
+    Frame->X = Viewport->SizeX;
+    Frame->Y = Viewport->SizeY;
+    Frame->XB = 0;
+    Frame->YB = 0;
+    Frame->Level = Viewport->Actor->GetLevel();
+    Frame->Parent = NULL;
+    Frame->Sibling = NULL;
+    Frame->Child = NULL;
+    Frame->iSurf = INDEX_NONE;
+    Frame->Recursion = 0;
+    Frame->Mirror = 1.0;
+    Frame->Recursion = 0;
+    Frame->NearClip = FPlane(0, 0, 0, 0);
+    Frame->Draw[0] = NULL;
+    Frame->Draw[1] = NULL;
+    Frame->Draw[2] = NULL;
+    Frame->Sprite = NULL;
+    Frame->Span = new(GSceneMem)FSpanBuffer;
+    Frame->Span->AllocIndexForScreen(Viewport->SizeX, Viewport->SizeY, &GSceneMem);
+    
+    // Compute coords.
+    Frame->ComputeRenderCoords(Location, Rotation);
+
+    // Compute zone.
+    Frame->ZoneNumber = Viewport->Actor->GetLevel()->Model->PointRegion(Viewport->Actor->GetLevel()->GetLevelInfo(), Frame->Coords.Origin).ZoneNumber;
+
+    return Frame;
+}
+//
 // FSceneNode* URender11::CreateChildFrame( FSceneNode* Parent, FSpanBuffer* Span, ULevel* Level, INT iSurf, INT iZone, FLOAT Mirror, const FPlane& NearClip, const FCoords& Coords, FScreenBounds* Bounds )
 // {
 // 	return nullptr;

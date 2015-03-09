@@ -48,8 +48,9 @@ UBOOL UD3D11RenderDevice::Init(UViewport* const pInViewport, const INT iNewX, co
 
         m_pGlobalShaderConstants = std::make_unique<GlobalShaderConstants>(m_Backend.GetDevice(), m_Backend.GetDeviceContext());
         m_pDeviceState = std::make_unique<DeviceState>(m_Backend.GetDevice(), m_Backend.GetDeviceContext());
-        m_pTileRenderer = std::make_unique<TileRenderer>(m_Backend.GetDevice(), m_Backend.GetDeviceContext());
         m_pTextureCache = std::make_unique<TextureCache>(m_Backend.GetDevice(), m_Backend.GetDeviceContext());
+        m_pTileRenderer = std::make_unique<TileRenderer>(m_Backend.GetDevice(), m_Backend.GetDeviceContext());
+        m_pGouraudRenderer = std::make_unique<GouraudRenderer>(m_Backend.GetDevice(), m_Backend.GetDeviceContext());
     }
     catch (const WException& ex)
     {
@@ -110,6 +111,7 @@ void UD3D11RenderDevice::Lock(const FPlane /*FlashScale*/, const FPlane /*FlashF
     m_bNoTilesDrawnYet = true;
     m_Backend.NewFrame();
     m_pTileRenderer->NewFrame();
+    m_pGouraudRenderer->NewFrame();
 }
 
 void UD3D11RenderDevice::Unlock(const UBOOL bBlit)
@@ -125,7 +127,7 @@ void UD3D11RenderDevice::Unlock(const UBOOL bBlit)
 void UD3D11RenderDevice::Render()
 {
     //Check if something to render
-    if (!m_pTileRenderer->IsMapped())
+    if (!m_pTileRenderer->IsMapped() && !m_pGouraudRenderer->IsMapped())
     {
         return;
     }
@@ -140,6 +142,13 @@ void UD3D11RenderDevice::Render()
         m_pTileRenderer->Bind();
         m_pTileRenderer->Draw();
     }
+
+    if (m_pGouraudRenderer->IsMapped())
+    {
+        m_pGouraudRenderer->Unmap();
+        m_pGouraudRenderer->Bind();
+        m_pGouraudRenderer->Draw();
+    }
 }
 
 void UD3D11RenderDevice::DrawComplexSurface(FSceneNode* const /*pFrame*/, FSurfaceInfo& /*Surface*/, FSurfaceFacet& /*Facet*/)
@@ -147,9 +156,50 @@ void UD3D11RenderDevice::DrawComplexSurface(FSceneNode* const /*pFrame*/, FSurfa
     assert(m_bNoTilesDrawnYet); //Want to be sure that tiles are the last thing to be drawn
 }
 
-void UD3D11RenderDevice::DrawGouraudPolygon(FSceneNode* const /*pFrame*/, FTextureInfo& /*Info*/, FTransTexture** const /*ppPts*/, const int /*NumPts*/, const DWORD /*PolyFlags*/, FSpanBuffer* const /*pSpan*/)
+void UD3D11RenderDevice::DrawGouraudPolygon(FSceneNode* const /*pFrame*/, FTextureInfo& Info, FTransTexture** const ppPts, const int NumPts, const DWORD PolyFlags, FSpanBuffer* const /*pSpan*/)
 {
-    //assert(m_bNoTilesDrawnYet); //Want to be sure that tiles are the last thing to be drawn
+    //assert(m_bNoTilesDrawnYet); //Want to be sure that tiles are the last thing to be drawn -> doesn't hold for gouraud
+
+    if (NumPts < 3) //Degenerate triangle
+    {
+        return;
+    }
+
+    const auto& BlendState = m_pDeviceState->GetBlendStateForPolyFlags(PolyFlags);
+    const auto& DepthStencilState = m_pDeviceState->GetDepthStencilStateForPolyFlags(PolyFlags);
+    if (!m_pDeviceState->IsBlendStatePrepared(BlendState) || !m_pDeviceState->IsDepthStencilStatePrepared(DepthStencilState) || !m_pTextureCache->IsPrepared(Info, 0) || m_pTileRenderer->IsMapped())
+    {
+        Render();
+    }
+
+    m_pDeviceState->PrepareDepthStencilState(DepthStencilState);
+    m_pDeviceState->PrepareBlendState(BlendState);
+    const TextureConverter::TextureData& texDiffuse = m_pTextureCache->FindOrInsertAndPrepare(Info, 0);
+
+    if (!m_pGouraudRenderer->IsMapped())
+    {
+        m_pGouraudRenderer->Map();
+    }
+
+    GouraudRenderer::Vertex* const v = m_pGouraudRenderer->GetTriangleFan(NumPts);
+    for (int i = 0; i < NumPts; i++) //Set fan verts
+    {
+        static_assert(sizeof(ppPts[i]->Point) >= sizeof(v[i].Pos), "Sizes differ, can't use reinterpret_cast");
+        v[i].Pos = reinterpret_cast<decltype(v[i].Pos)&>(ppPts[i]->Point);
+
+        static_assert(sizeof(ppPts[i]->Light) >= sizeof(v[i].Color), "Sizes differ, can't use reinterpret_cast");
+        v[i].Color = reinterpret_cast<decltype(v[i].Color)&>(ppPts[i]->Light);
+
+        v[i].TexCoords.x = ppPts[i]->U * texDiffuse.fMultU;
+        v[i].TexCoords.y = ppPts[i]->V * texDiffuse.fMultV;
+
+        v[i].PolyFlags = PolyFlags;
+
+      //  v->Fog = *(Vec4*)&Pts[i]->Fog.X;
+
+
+    }
+
 }
 
 void UD3D11RenderDevice::DrawTile(FSceneNode* const /*pFrame*/, FTextureInfo& Info, const FLOAT fX, const FLOAT fY, const FLOAT fXL, const FLOAT fYL, const FLOAT fU, const FLOAT fV, const FLOAT fUL, const FLOAT fVL, FSpanBuffer* const /*pSpan*/, const FLOAT fZ, const FPlane Color, const FPlane /*Fog*/, const DWORD PolyFlags)
@@ -162,10 +212,13 @@ void UD3D11RenderDevice::DrawTile(FSceneNode* const /*pFrame*/, FTextureInfo& In
     const DWORD PolyFlagsCorrected = (PolyFlags & (PF_Translucent | PF_Masked)) != PF_Masked ? PolyFlags ^ PF_Masked : PolyFlags; //Translucent has precedence over masked
 
     const auto& BlendState = m_pDeviceState->GetBlendStateForPolyFlags(PolyFlagsCorrected);
-    if (!m_pDeviceState->IsBlendStatePrepared(BlendState) || !m_pTextureCache->IsPrepared(Info, 0))
+
+    //Flush state
+    if (!m_pDeviceState->IsBlendStatePrepared(BlendState) || !m_pTextureCache->IsPrepared(Info, 0) || m_pGouraudRenderer->IsMapped())
     {
         Render();
     }
+
     m_pDeviceState->PrepareBlendState(BlendState);
     m_pTextureCache->FindOrInsertAndPrepare(Info, 0);
 
@@ -187,7 +240,8 @@ void UD3D11RenderDevice::DrawTile(FSceneNode* const /*pFrame*/, FTextureInfo& In
     t.TexCoord.w = (fV + fVL) / Info.Texture->VSize;
 
     //t.Z = fZ;
-    t.Color = reinterpret_cast<const DirectX::XMFLOAT3&>(Color);
+    static_assert(sizeof(Color) >= sizeof(t.Color), "Sizes differ, can't use reinterpret_cast");
+    t.Color = reinterpret_cast<const decltype(t.Color)&>(Color);
 
     t.PolyFlags = PolyFlagsCorrected;
 }
@@ -217,9 +271,19 @@ void UD3D11RenderDevice::PopHit(const INT /*iCount*/, const UBOOL /*bForce*/)
 
 }
 
+
+
 void UD3D11RenderDevice::GetStats(TCHAR* const pResult)
 {
-    swprintf_s(pResult, 128, L"Tile: Buf %u/%u, Drw %u. Tex: %Iu", m_pTileRenderer->GetNumTiles(), m_pTileRenderer->GetMaxTiles(), m_pTileRenderer->GetNumDraws(), m_pTextureCache->GetNumTextures());
+    //Buffer is only 128 chars, so we do our own thing
+    assert(Viewport);
+    assert(Viewport->Canvas);
+
+    PrintFunc(L"Tiles | Buffer fill: %Iu/%Iu. Draw calls: %Iu.", m_pTileRenderer->GetNumTiles(), m_pTileRenderer->GetMaxTiles(), m_pTileRenderer->GetNumDraws());
+    PrintFunc(L"Gouraud | Buffer fill: %Iu/%Iu. Draw calls: %Iu.", m_pGouraudRenderer->GetNumIndices(), m_pGouraudRenderer->GetMaxIndices(), m_pGouraudRenderer->GetNumDraws());
+    PrintFunc(L"TexCache | Num: %Iu.", m_pTextureCache->GetNumTextures());
+
+    m_pTextureCache->PrintSizeHistogram(*Viewport->Canvas);
 }
 
 void UD3D11RenderDevice::ReadPixels(FColor* const /*pPixels*/)
@@ -235,7 +299,7 @@ UBOOL UD3D11RenderDevice::Exec(const TCHAR* const Cmd, FOutputDevice& Ar /*= *GL
     if (wcscmp(Cmd, L"texsizehist") == 0)
     {
         assert(m_pTextureCache);
-        m_pTextureCache->PrintSizeHistogram();
+        //m_pTextureCache->PrintSizeHistogram();
     }
 
     return URenderDevice::Exec(Cmd, Ar);

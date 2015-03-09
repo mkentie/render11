@@ -58,6 +58,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>false</MinimalRebuild>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -81,6 +82,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="DynamicBuffer.h" />
+    <ClInclude Include="GouraudRenderer.h" />
     <ClInclude Include="TextureCache.h" />
     <ClInclude Include="ConstantBuffer.h" />
     <ClInclude Include="D3D11Drv.h" />
@@ -96,6 +98,7 @@
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="GouraudRenderer.cpp" />
     <ClCompile Include="TextureCache.cpp" />
     <ClCompile Include="D3D11Drv.cpp" />
     <ClCompile Include="DeviceState.cpp" />
@@ -111,18 +114,24 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="Tile.hlsl">
+    <FxCompile Include="Tile.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Deus Ex Release|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Deus Ex Debug|Win32'">Vertex</ShaderType>
       <FileType>Document</FileType>
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Deus Ex Debug|Win32'">VSMain</EntryPointName>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Deus Ex Debug|Win32'">4.0</ShaderModel>
-    </CustomBuild>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="Render11.hlsli">
+    <None Include="Render11.hlsli">
       <FileType>Document</FileType>
-    </CustomBuild>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Gouraud.hlsl">
+      <FileType>Document</FileType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Deus Ex Debug|Win32'">4.0</ShaderModel>
+    </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

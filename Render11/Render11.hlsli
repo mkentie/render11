@@ -2,8 +2,7 @@ static const uint PF_Masked = 0x00000002;
 
 cbuffer CBufGlobal : register(b0)
 {
-    float2 fRes;
-    float padding[2];
+    float4 fRes;
     matrix ProjectionMatrix;
 };
 
