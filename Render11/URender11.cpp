@@ -99,10 +99,32 @@ FSceneNode* URender11::CreateMasterFrame( UViewport* Viewport, FVector Location,
 // 
 // }
 // 
-// void URender11::DrawWorld( FSceneNode* const pFrame )
-// {
-//  
-// }
+
+
+void DoShit(FSceneNode* const pFrame)
+{
+    for (FSceneNode* F = pFrame->Child; F; F = F->Sibling)
+    {
+        DoShit(F);
+    }
+    pFrame->Child = nullptr;
+    pFrame->Sprite = nullptr;
+    int i = 0;
+    for (FDynamicSprite* pS = pFrame->Sprite; pS; pS = pS->RenderNext)
+    {
+        i++;
+    }
+}
+
+ void URender11::DrawWorld( FSceneNode* const pFrame )
+{
+    DoShit(pFrame);
+    pFrame->Child = nullptr;
+    pFrame->Sprite = nullptr;
+    URender::DrawWorld(pFrame);
+    
+
+}
 // 
 // void URender11::DrawActor( FSceneNode* Frame, AActor* Actor )
 // {

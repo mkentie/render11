@@ -46,11 +46,15 @@ UBOOL UD3D11RenderDevice::Init(UViewport* const pInViewport, const INT iNewX, co
             return false;
         }
 
-        m_pGlobalShaderConstants = std::make_unique<GlobalShaderConstants>(m_Backend.GetDevice(), m_Backend.GetDeviceContext());
-        m_pDeviceState = std::make_unique<DeviceState>(m_Backend.GetDevice(), m_Backend.GetDeviceContext());
-        m_pTextureCache = std::make_unique<TextureCache>(m_Backend.GetDevice(), m_Backend.GetDeviceContext());
-        m_pTileRenderer = std::make_unique<TileRenderer>(m_Backend.GetDevice(), m_Backend.GetDeviceContext());
-        m_pGouraudRenderer = std::make_unique<GouraudRenderer>(m_Backend.GetDevice(), m_Backend.GetDeviceContext());
+        auto& Device = m_Backend.GetDevice();
+        auto& DeviceContext = m_Backend.GetDeviceContext();
+
+        m_pGlobalShaderConstants = std::make_unique<GlobalShaderConstants>(Device, DeviceContext);
+        m_pDeviceState = std::make_unique<DeviceState>(Device, DeviceContext);
+        m_pTextureCache = std::make_unique<TextureCache>(Device, DeviceContext);
+        m_pTileRenderer = std::make_unique<TileRenderer>(Device, DeviceContext);
+        m_pGouraudRenderer = std::make_unique<GouraudRenderer>(Device, DeviceContext);
+        m_pComplexSurfaceRenderer = std::make_unique<ComplexSurfaceRenderer>(Device, DeviceContext);
     }
     catch (const WException& ex)
     {
@@ -98,6 +102,7 @@ void UD3D11RenderDevice::Flush(const UBOOL /*bAllowPrecache*/)
 
 }
 
+
 void UD3D11RenderDevice::SetSceneNode(FSceneNode* const pFrame)
 {
     assert(pFrame);
@@ -112,6 +117,7 @@ void UD3D11RenderDevice::Lock(const FPlane /*FlashScale*/, const FPlane /*FlashF
     m_Backend.NewFrame();
     m_pTileRenderer->NewFrame();
     m_pGouraudRenderer->NewFrame();
+    m_pComplexSurfaceRenderer->NewFrame();
 }
 
 void UD3D11RenderDevice::Unlock(const UBOOL bBlit)
@@ -127,7 +133,7 @@ void UD3D11RenderDevice::Unlock(const UBOOL bBlit)
 void UD3D11RenderDevice::Render()
 {
     //Check if something to render
-    if (!m_pTileRenderer->IsMapped() && !m_pGouraudRenderer->IsMapped())
+    if (!m_pTileRenderer->IsMapped() && !m_pGouraudRenderer->IsMapped() && !m_pComplexSurfaceRenderer->IsMapped())
     {
         return;
     }
@@ -149,11 +155,120 @@ void UD3D11RenderDevice::Render()
         m_pGouraudRenderer->Bind();
         m_pGouraudRenderer->Draw();
     }
+
+    if (m_pComplexSurfaceRenderer->IsMapped())
+    {
+        m_pComplexSurfaceRenderer->Unmap();
+        m_pComplexSurfaceRenderer->Bind();
+        m_pComplexSurfaceRenderer->Draw();
+    }
 }
 
-void UD3D11RenderDevice::DrawComplexSurface(FSceneNode* const /*pFrame*/, FSurfaceInfo& /*Surface*/, FSurfaceFacet& /*Facet*/)
+void UD3D11RenderDevice::DrawComplexSurface(FSceneNode* const /*pFrame*/, FSurfaceInfo& Surface, FSurfaceFacet& Facet)
 {
     assert(m_bNoTilesDrawnYet); //Want to be sure that tiles are the last thing to be drawn
+
+    const DWORD PolyFlags = Surface.PolyFlags;
+    const auto& BlendState = m_pDeviceState->GetBlendStateForPolyFlags(PolyFlags);
+    const auto& DepthStencilState = m_pDeviceState->GetDepthStencilStateForPolyFlags(PolyFlags);
+    if (!m_pDeviceState->IsBlendStatePrepared(BlendState) || !m_pDeviceState->IsDepthStencilStatePrepared(DepthStencilState) || m_pTileRenderer->IsMapped() || m_pGouraudRenderer->IsMapped())
+    {
+        Render();
+    }
+
+    unsigned int TexFlags = 0;
+
+    const TextureConverter::TextureData* pTexDiffuse = nullptr;
+    if (Surface.Texture)
+    {
+        if (!m_pTextureCache->IsPrepared(*Surface.Texture, 0))
+        {
+            Render();
+        }
+        pTexDiffuse = &m_pTextureCache->FindOrInsertAndPrepare(*Surface.Texture, 0);
+        TexFlags |= 0x00000001;
+    }
+
+    const TextureConverter::TextureData* pTexLight = nullptr;
+    if (Surface.LightMap)
+    {
+        if (!m_pTextureCache->IsPrepared(*Surface.LightMap, 1))
+        {
+            Render();
+        }
+        pTexLight = &m_pTextureCache->FindOrInsertAndPrepare(*Surface.LightMap, 1);
+        TexFlags |= 0x00000002;
+    }
+
+    m_pDeviceState->PrepareDepthStencilState(DepthStencilState);
+    m_pDeviceState->PrepareBlendState(BlendState);
+
+    if (!m_pComplexSurfaceRenderer->IsMapped())
+    {
+        m_pComplexSurfaceRenderer->Map();
+    }
+
+    //Code from OpenGL renderer to calculate texture coordinates
+    const float UDot = Facet.MapCoords.XAxis | Facet.MapCoords.Origin;
+    const float VDot = Facet.MapCoords.YAxis | Facet.MapCoords.Origin;
+
+    //Draw each polygon
+    for (const FSavedPoly* pPoly = Facet.Polys; pPoly; pPoly = pPoly->Next)
+    {
+        assert(pPoly);
+        const FSavedPoly& Poly = *pPoly;
+        if (Poly.NumPts < 3) //Skip invalid polygons
+        {
+            continue;
+        }
+
+        ComplexSurfaceRenderer::Vertex* const pVerts = m_pComplexSurfaceRenderer->GetTriangleFan(Poly.NumPts); //Reserve space and generate indices for fan		
+        for (int i = 0; i < Poly.NumPts; i++)
+        {
+            ComplexSurfaceRenderer::Vertex& v = pVerts[i];
+
+            //Code from OpenGL renderer to calculate texture coordinates
+            const float U = Facet.MapCoords.XAxis | Poly.Pts[i]->Point;
+            const float V = Facet.MapCoords.YAxis | Poly.Pts[i]->Point;
+            const float UCoord = U - UDot;
+            const float VCoord = V - VDot;
+
+            //Diffuse texture coordinates
+            v.TexCoords.x = (UCoord - Surface.Texture->Pan.X)*pTexDiffuse->fMultU;
+            v.TexCoords.y = (VCoord - Surface.Texture->Pan.Y)*pTexDiffuse->fMultV;
+
+            if (Surface.LightMap)
+            {
+                //Lightmaps require pan correction of -.5
+                v.TexCoords1.x = (UCoord - (Surface.LightMap->Pan.X - 0.5f*Surface.LightMap->UScale))*pTexLight->fMultU;
+                v.TexCoords1.y = (VCoord - (Surface.LightMap->Pan.Y - 0.5f*Surface.LightMap->VScale))*pTexLight->fMultV;
+            }
+            //if (Surface.DetailTexture)
+            //{
+            //    v->TexCoord[2].x = (UCoord - Surface.DetailTexture->Pan.X)*detail->multU;
+            //    v->TexCoord[2].y = (VCoord - Surface.DetailTexture->Pan.Y)*detail->multV;
+            //}
+            //if (Surface.FogMap)
+            //{
+            //    //Fogmaps require pan correction of -.5
+            //    v->TexCoord[3].x = (UCoord - (Surface.FogMap->Pan.X - 0.5f*Surface.FogMap->UScale))*fogMap->multU;
+            //    v->TexCoord[3].y = (VCoord - (Surface.FogMap->Pan.Y - 0.5f*Surface.FogMap->VScale))*fogMap->multV;
+            //}
+            //if (Surface.MacroTexture)
+            //{
+            //    v->TexCoord[4].x = (UCoord - Surface.MacroTexture->Pan.X)*macro->multU;
+            //    v->TexCoord[4].y = (VCoord - Surface.MacroTexture->Pan.Y)*macro->multV;
+            //}
+
+            static_assert(sizeof(Poly.Pts[i]->Point) >= sizeof(v.Pos), "Sizes differ, can't use reinterpret_cast");
+            v.Pos = reinterpret_cast<decltype(v.Pos)&>(Poly.Pts[i]->Point);
+
+            v.PolyFlags = PolyFlags;
+            v.TexFlags = TexFlags;
+
+        }
+
+    }
 }
 
 void UD3D11RenderDevice::DrawGouraudPolygon(FSceneNode* const /*pFrame*/, FTextureInfo& Info, FTransTexture** const ppPts, const int NumPts, const DWORD PolyFlags, FSpanBuffer* const /*pSpan*/)
@@ -167,7 +282,7 @@ void UD3D11RenderDevice::DrawGouraudPolygon(FSceneNode* const /*pFrame*/, FTextu
 
     const auto& BlendState = m_pDeviceState->GetBlendStateForPolyFlags(PolyFlags);
     const auto& DepthStencilState = m_pDeviceState->GetDepthStencilStateForPolyFlags(PolyFlags);
-    if (!m_pDeviceState->IsBlendStatePrepared(BlendState) || !m_pDeviceState->IsDepthStencilStatePrepared(DepthStencilState) || !m_pTextureCache->IsPrepared(Info, 0) || m_pTileRenderer->IsMapped())
+    if (!m_pDeviceState->IsBlendStatePrepared(BlendState) || !m_pDeviceState->IsDepthStencilStatePrepared(DepthStencilState) || !m_pTextureCache->IsPrepared(Info, 0) || m_pTileRenderer->IsMapped() || m_pComplexSurfaceRenderer->IsMapped())
     {
         Render();
     }
@@ -181,19 +296,21 @@ void UD3D11RenderDevice::DrawGouraudPolygon(FSceneNode* const /*pFrame*/, FTextu
         m_pGouraudRenderer->Map();
     }
 
-    GouraudRenderer::Vertex* const v = m_pGouraudRenderer->GetTriangleFan(NumPts);
+    GouraudRenderer::Vertex* const pVerts = m_pGouraudRenderer->GetTriangleFan(NumPts);
     for (int i = 0; i < NumPts; i++) //Set fan verts
     {
-        static_assert(sizeof(ppPts[i]->Point) >= sizeof(v[i].Pos), "Sizes differ, can't use reinterpret_cast");
-        v[i].Pos = reinterpret_cast<decltype(v[i].Pos)&>(ppPts[i]->Point);
+        GouraudRenderer::Vertex& v = pVerts[i];
 
-        static_assert(sizeof(ppPts[i]->Light) >= sizeof(v[i].Color), "Sizes differ, can't use reinterpret_cast");
-        v[i].Color = reinterpret_cast<decltype(v[i].Color)&>(ppPts[i]->Light);
+        static_assert(sizeof(ppPts[i]->Point) >= sizeof(v.Pos), "Sizes differ, can't use reinterpret_cast");
+        v.Pos = reinterpret_cast<decltype(v.Pos)&>(ppPts[i]->Point);
 
-        v[i].TexCoords.x = ppPts[i]->U * texDiffuse.fMultU;
-        v[i].TexCoords.y = ppPts[i]->V * texDiffuse.fMultV;
+        static_assert(sizeof(ppPts[i]->Light) >= sizeof(v.Color), "Sizes differ, can't use reinterpret_cast");
+        v.Color = reinterpret_cast<decltype(v.Color)&>(ppPts[i]->Light);
 
-        v[i].PolyFlags = PolyFlags;
+        v.TexCoords.x = ppPts[i]->U * texDiffuse.fMultU;
+        v.TexCoords.y = ppPts[i]->V * texDiffuse.fMultV;
+
+        v.PolyFlags = PolyFlags;
 
       //  v->Fog = *(Vec4*)&Pts[i]->Fog.X;
 
@@ -214,7 +331,7 @@ void UD3D11RenderDevice::DrawTile(FSceneNode* const /*pFrame*/, FTextureInfo& In
     const auto& BlendState = m_pDeviceState->GetBlendStateForPolyFlags(PolyFlagsCorrected);
 
     //Flush state
-    if (!m_pDeviceState->IsBlendStatePrepared(BlendState) || !m_pTextureCache->IsPrepared(Info, 0) || m_pGouraudRenderer->IsMapped())
+    if (!m_pDeviceState->IsBlendStatePrepared(BlendState) || !m_pTextureCache->IsPrepared(Info, 0) || m_pGouraudRenderer->IsMapped() || m_pComplexSurfaceRenderer->IsMapped())
     {
         Render();
     }
@@ -273,7 +390,7 @@ void UD3D11RenderDevice::PopHit(const INT /*iCount*/, const UBOOL /*bForce*/)
 
 
 
-void UD3D11RenderDevice::GetStats(TCHAR* const pResult)
+void UD3D11RenderDevice::GetStats(TCHAR* const /*pResult*/)
 {
     //Buffer is only 128 chars, so we do our own thing
     assert(Viewport);
@@ -281,6 +398,7 @@ void UD3D11RenderDevice::GetStats(TCHAR* const pResult)
 
     PrintFunc(L"Tiles | Buffer fill: %Iu/%Iu. Draw calls: %Iu.", m_pTileRenderer->GetNumTiles(), m_pTileRenderer->GetMaxTiles(), m_pTileRenderer->GetNumDraws());
     PrintFunc(L"Gouraud | Buffer fill: %Iu/%Iu. Draw calls: %Iu.", m_pGouraudRenderer->GetNumIndices(), m_pGouraudRenderer->GetMaxIndices(), m_pGouraudRenderer->GetNumDraws());
+    PrintFunc(L"Complex | Buffer fill: %Iu/%Iu. Draw calls: %Iu.", m_pComplexSurfaceRenderer->GetNumIndices(), m_pComplexSurfaceRenderer->GetMaxIndices(), m_pComplexSurfaceRenderer->GetNumDraws());
     PrintFunc(L"TexCache | Num: %Iu.", m_pTextureCache->GetNumTextures());
 
     m_pTextureCache->PrintSizeHistogram(*Viewport->Canvas);

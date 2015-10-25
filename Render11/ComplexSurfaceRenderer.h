@@ -2,20 +2,21 @@
 
 #include "DynamicBuffer.h"
 
-class GouraudRenderer
+class ComplexSurfaceRenderer
 {
 public:
     struct Vertex
     {
         DirectX::XMFLOAT3 Pos;
-        DirectX::XMFLOAT3 Color;
         DirectX::XMFLOAT2 TexCoords;
+        DirectX::XMFLOAT2 TexCoords1;
         unsigned int PolyFlags;
+        unsigned int TexFlags;
     };
 
-    explicit GouraudRenderer(ID3D11Device& Device, ID3D11DeviceContext& DeviceContext);
-    GouraudRenderer(const GouraudRenderer&) = delete;
-    GouraudRenderer& operator=(const GouraudRenderer&) = delete;
+    explicit ComplexSurfaceRenderer(ID3D11Device& Device, ID3D11DeviceContext& DeviceContext);
+    ComplexSurfaceRenderer(const ComplexSurfaceRenderer&) = delete;
+    ComplexSurfaceRenderer& operator=(const ComplexSurfaceRenderer&) = delete;
 
     void NewFrame();
     void Map() { m_VertexBuffer.Map(); m_IndexBuffer.Map(); }
@@ -25,7 +26,7 @@ public:
     void Bind();
     void Draw();
 
-    Vertex* GetTriangleFan(const size_t iSize) { return DynamicGPUBufferHelpers::GetTriangleFan(m_VertexBuffer, m_IndexBuffer, iSize); }
+    Vertex* GetTriangleFan(const size_t iSize) { return DynamicGPUBufferHelpers::GetTriangleFan(m_VertexBuffer, m_IndexBuffer, iSize); };
 
     //Diagnostics
     size_t GetNumIndices() const { return m_IndexBuffer.GetSize(); }

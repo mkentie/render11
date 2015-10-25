@@ -10,11 +10,17 @@ TextureCache::TextureCache(ID3D11Device& Device, ID3D11DeviceContext& DeviceCont
     ResetDirtySlots();
 }
 
-const TextureConverter::TextureData& TextureCache::FindOrInsert(const FTextureInfo& Texture)
+const TextureConverter::TextureData& TextureCache::FindOrInsert(FTextureInfo& Texture)
 {
-    const auto it = m_Textures.find(Texture.CacheID);
-    if (it != m_Textures.cend())
+    auto it = m_Textures.find(Texture.CacheID);
+    if (it != m_Textures.end())
     {
+        if (Texture.bRealtimeChanged)
+        {
+            m_TextureConverter.Update(Texture, it->second);
+            Texture.bRealtimeChanged = 0; //Clear this flag (from other renderes)
+        }
+
         return it->second;
     }
 
@@ -25,7 +31,7 @@ const TextureConverter::TextureData& TextureCache::FindOrInsert(const FTextureIn
 }
 
 
-const TextureConverter::TextureData& TextureCache::FindOrInsertAndPrepare(const FTextureInfo& Texture, const size_t iSlot)
+const TextureConverter::TextureData& TextureCache::FindOrInsertAndPrepare(FTextureInfo& Texture, const size_t iSlot)
 {
     const TextureConverter::TextureData& Data = FindOrInsert(Texture);
 

@@ -9,10 +9,6 @@ public:
     explicit DynamicGPUBuffer(ID3D11Device& Device, ID3D11DeviceContext& DeviceContext, const size_t iReserve)
     :m_Device(Device)
     ,m_DeviceContext(DeviceContext)
-    ,m_Mapping()
-    ,m_iReserved(0)
-    ,m_iSize(0)
-    ,m_iMapStart(0)
     {
         Alloc(iReserve);
     }
@@ -153,9 +149,38 @@ protected:
     ID3D11DeviceContext& m_DeviceContext;
 
     ComPtr<ID3D11Buffer> m_pBuffer;
-    D3D11_MAPPED_SUBRESOURCE m_Mapping;
+    D3D11_MAPPED_SUBRESOURCE m_Mapping = {};
 
-    size_t m_iReserved;
-    size_t m_iSize;
-    size_t m_iMapStart; //!< Start index of current Map() call, so users know which data to draw
+    size_t m_iReserved = 0;
+    size_t m_iSize = 0;
+    size_t m_iMapStart = 0; //!< Start index of current Map() call, so users know which data to draw
 };
+
+namespace DynamicGPUBufferHelpers
+{
+    constexpr size_t Fan2StripIndices(const size_t iSize)
+    {
+        return 2 * (iSize - 2) + 2;
+    }
+
+    template<class VertType, class IndexType>
+    VertType* GetTriangleFan(DynamicGPUBuffer<VertType, D3D11_BIND_FLAG::D3D11_BIND_VERTEX_BUFFER>& VertexBuffer, DynamicGPUBuffer<IndexType, D3D11_BIND_FLAG::D3D11_BIND_INDEX_BUFFER>& IndexBuffer, const size_t iSize)
+    {
+        //Generate indices
+        assert(iSize >= 3);
+        const size_t iNumIndices = Fan2StripIndices(iSize);
+        IndexType* const pIndices = IndexBuffer.PushBack(iNumIndices);
+
+        assert(VertexBuffer.GetSize() < std::numeric_limits<IndexType>::max());
+        const IndexType iNumVerts = static_cast<IndexType>(VertexBuffer.GetSize());
+        pIndices[0] = iNumVerts + 1;
+        for (IndexType i = 1; i < iNumIndices - 1; i += 2)
+        {
+            pIndices[i] = iNumVerts + (i / 2) + 2;
+            pIndices[i + 1] = iNumVerts; //Center point
+        }
+        pIndices[iNumIndices - 1] = std::numeric_limits<IndexType>::max(); //Strip-cut index
+
+        return VertexBuffer.PushBack(iSize);
+    }
+}

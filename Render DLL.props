@@ -44,5 +44,16 @@ copy "$(TargetPath)"  "$(SolutionDir)\packages\$(GAMENAME)"
       <Command>
       </Command>
     </PreBuildEvent>
+    <FxCompile>
+      <DisableOptimizations>false</DisableOptimizations>
+    </FxCompile>
+    <FxCompile>
+      <EnableDebuggingInformation>false</EnableDebuggingInformation>
+    </FxCompile>
+    <FxCompile>
+      <ShaderModel>4.0</ShaderModel>
+      <EntryPointName>PSMain</EntryPointName>
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
   </ItemDefinitionGroup>
 </Project>

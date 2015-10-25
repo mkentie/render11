@@ -4,6 +4,7 @@
 
 #include "TileRenderer.h" //Can't forward declare as DECLARE_CLASS implements destructor
 #include "GouraudRenderer.h"
+#include "ComplexSurfaceRenderer.h"
 #include "DeviceState.h"
 #include "TextureCache.h"
 
@@ -38,6 +39,7 @@ protected:
     std::unique_ptr<DeviceState> m_pDeviceState;
     std::unique_ptr<TileRenderer> m_pTileRenderer;
     std::unique_ptr<GouraudRenderer> m_pGouraudRenderer;
+    std::unique_ptr<ComplexSurfaceRenderer> m_pComplexSurfaceRenderer;
     std::unique_ptr<TextureCache> m_pTextureCache;
 
     bool m_bNoTilesDrawnYet;

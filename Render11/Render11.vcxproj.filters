@@ -81,6 +81,9 @@
     <ClInclude Include="GouraudRenderer.h">
       <Filter>_Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ComplexSurfaceRenderer.h">
+      <Filter>_Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="URender11.cpp">
@@ -116,12 +119,18 @@
     <ClCompile Include="GouraudRenderer.cpp">
       <Filter>_Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ComplexSurfaceRenderer.cpp">
+      <Filter>_Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Gouraud.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="Tile.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="ComplexSurface.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

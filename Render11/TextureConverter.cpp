@@ -4,6 +4,9 @@
 
 void TextureConverter::ConvertedTextureData::Resize(const FTextureInfo& Texture, const IFormatConverter& FormatConverter)
 {
+    m_SubResourceData.clear();
+    m_Mips.clear();
+
     m_SubResourceData.resize(Texture.NumMips);
 
     const bool bWantsBuffer = FormatConverter.WantsBuffer();
@@ -22,6 +25,17 @@ void TextureConverter::ConvertedTextureData::Resize(const FTextureInfo& Texture,
             m_SubResourceData[i].pSysMem = m_Mips[i].data();
         }
         m_SubResourceData[i].SysMemPitch = FormatConverter.GetStride(UnrealMip);
+    }
+}
+
+void TextureConverter::FormatConverterIdentity::Convert(const FTextureInfo& Texture)
+{
+    m_Buffer.Resize(Texture, *this);
+    for (INT i = 0; i < Texture.NumMips; i++)
+    {
+        assert(Texture.Mips[i]);
+        const FMipmapBase& UnrealMip = *Texture.Mips[i];
+        m_Buffer.SetSubResourceDataSysMem(i, UnrealMip.DataPtr);
     }
 }
 
@@ -52,33 +66,9 @@ void TextureConverter::FormatConverterP8::Convert(const FTextureInfo& Texture)
     }
 }
 
-void TextureConverter::FormatConverterDXT::Convert(const FTextureInfo& Texture)
-{
-    assert(Texture.Format == ETextureFormat::TEXF_DXT1);
-
-    m_Buffer.Resize(Texture, *this);
-    for (INT i = 0; i < Texture.NumMips; i++)
-    {
-        assert(Texture.Mips[i]);
-        const FMipmapBase& UnrealMip = *Texture.Mips[i];
-        m_Buffer.GetSubResourceDataMemPtr(i) = UnrealMip.DataPtr;
-    }
-}
-
-
 TextureConverter::TextureConverter(ID3D11Device& Device, ID3D11DeviceContext& DeviceContext)
 :m_Device(Device)
 ,m_DeviceContext(DeviceContext)
-,m_FormatConverterP8(m_ConvertedTextureData)
-,m_FormatConverterDXT(m_ConvertedTextureData)
-,m_FormatConverters({
-    &m_FormatConverterP8, // TEXF_P8
-    nullptr, // TEXF_RGBA7
-    nullptr, // TEXF_RGB16
-    &m_FormatConverterDXT, // TEXF_DXT1
-    nullptr, //TEXF_RGB8
-    nullptr //TEXF_RGBA8
-        })
 {
 
     //Create placeholder texture
@@ -116,33 +106,39 @@ TextureConverter::TextureConverter(ID3D11Device& Device, ID3D11DeviceContext& De
     SetResourceName(m_PlaceholderTexture.pShaderResourceView, "Placeholder texture");
 }
 
-TextureConverter::TextureData TextureConverter::Convert(const FTextureInfo& Texture)
+TextureConverter::TextureData TextureConverter::Convert(const FTextureInfo& Texture) const
 {
     IFormatConverter* const pConverter = m_FormatConverters[Texture.Format];
     if (pConverter == nullptr)
     {
-        return m_PlaceholderTexture;
+         return m_PlaceholderTexture;
     }
+
+    const bool bDynamic = Texture.bRealtimeChanged; //bRealtime isn't always set
 
     pConverter->Convert(Texture);
 
     TextureData OutputTexture;
 
     D3D11_TEXTURE2D_DESC TextureDesc;
-    TextureDesc.Width = Texture.USize;
-    TextureDesc.Height = Texture.VSize;
+    TextureDesc.Width = Texture.UClamp;
+    TextureDesc.Height = Texture.VClamp;
     TextureDesc.MipLevels = Texture.NumMips;
     TextureDesc.ArraySize = 1;
     TextureDesc.Format = pConverter->GetDXGIFormat();
     TextureDesc.SampleDesc.Count = 1;
     TextureDesc.SampleDesc.Quality = 0;
-    TextureDesc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
+    TextureDesc.Usage = bDynamic ? D3D11_USAGE::D3D11_USAGE_DEFAULT: D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
+    //TextureDesc.Usage = bDynamic ? D3D11_USAGE::D3D11_USAGE_DYNAMIC : D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
     TextureDesc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE;
-    TextureDesc.CPUAccessFlags = 0;
+    TextureDesc.CPUAccessFlags =  0;
+    //TextureDesc.CPUAccessFlags = bDynamic ? D3D11_CPU_ACCESS_FLAG::D3D11_CPU_ACCESS_WRITE : 0;
     TextureDesc.MiscFlags = 0;
 
-    ThrowIfFail(m_Device.CreateTexture2D(&TextureDesc, m_ConvertedTextureData.GetSubResourceData(), &OutputTexture.pTexture), L"Failed to create texture '%s'.", Texture.Texture->GetName());
-    SetResourceNameW(OutputTexture.pTexture, Texture.Texture->GetName());
+    const wchar_t* const pszTexName = Texture.Texture ? Texture.Texture->GetName() : nullptr;
+
+    ThrowIfFail(m_Device.CreateTexture2D(&TextureDesc, m_ConvertedTextureData.GetSubResourceDataArray(), &OutputTexture.pTexture), L"Failed to create texture '%s'.", pszTexName);
+    SetResourceNameW(OutputTexture.pTexture, pszTexName);
 
     D3D11_SHADER_RESOURCE_VIEW_DESC ShaderResourceViewDesc;
     ShaderResourceViewDesc.Format = TextureDesc.Format;
@@ -150,12 +146,38 @@ TextureConverter::TextureData TextureConverter::Convert(const FTextureInfo& Text
     ShaderResourceViewDesc.Texture2D.MipLevels = Texture.NumMips;
     ShaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
 
-    ThrowIfFail(m_Device.CreateShaderResourceView(OutputTexture.pTexture.Get(), &ShaderResourceViewDesc, &OutputTexture.pShaderResourceView), L"Failed to create SRV for '%s'.", Texture.Texture->GetName());
-    SetResourceNameW(OutputTexture.pShaderResourceView, Texture.Texture->GetName());
+    ThrowIfFail(m_Device.CreateShaderResourceView(OutputTexture.pTexture.Get(), &ShaderResourceViewDesc, &OutputTexture.pShaderResourceView), L"Failed to create SRV for '%s'.", pszTexName);
+    SetResourceNameW(OutputTexture.pShaderResourceView, pszTexName);
 
-    //Set params
-    OutputTexture.fMultU = Texture.UScale / Texture.USize;
-    OutputTexture.fMultV = Texture.VScale / Texture.VSize;
+    OutputTexture.fMultU = 1.0f / (Texture.UClamp * Texture.UScale);
+    OutputTexture.fMultV = 1.0f / (Texture.VClamp * Texture.VScale);
 
     return OutputTexture;
+}
+
+void TextureConverter::Update(const FTextureInfo& Source, TextureData& Dest) const
+{
+    assert(Source.bRealtimeChanged);
+
+    IFormatConverter* const pConverter = m_FormatConverters[Source.Format];
+    assert(pConverter); //Should have a converter as it was converted succesfully before
+
+    pConverter->Convert(Source);
+
+    for (int i = 0; i < Source.NumMips; i++)
+    {
+        m_DeviceContext.UpdateSubresource(Dest.pTexture.Get(), i, nullptr, m_ConvertedTextureData.GetSubResourceDataSysMem(i), sizeof(DWORD)*Source.Mips[i]->USize, 0);
+
+        //D3D11_MAPPED_SUBRESOURCE Mapping;
+        //m_DeviceContext.Map(Dest.pTexture.Get(), i, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, 0, &Mapping);
+
+        //char* pDst = static_cast<char*>(Mapping.pData);
+        //for (int y = 0; y < Source.VClamp; y++)
+        //{
+        //    memcpy(pDst, &Source.Mips[i]->DataPtr[y*sizeof(DWORD)*Source.Mips[i]->USize], sizeof(DWORD)*Source.UClamp);
+        //    pDst += Mapping.RowPitch;
+        //}
+
+        //m_DeviceContext.Unmap(Dest.pTexture.Get(), i);
+    }
 }

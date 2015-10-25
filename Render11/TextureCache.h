@@ -4,14 +4,14 @@
 class TextureCache
 {
 public:
-    static const unsigned int sm_iMaxSlots = 1; //Maximum texture slot managed by the cache
+    static const unsigned int sm_iMaxSlots = 2; //Maximum texture slot managed by the cache
 
     explicit TextureCache(ID3D11Device& Device, ID3D11DeviceContext& DeviceContext);
     TextureCache(const TextureCache&) = delete;
     TextureCache& operator=(const TextureCache&) = delete;
 
-    const TextureConverter::TextureData& FindOrInsert(const FTextureInfo& Texture);
-    const TextureConverter::TextureData& FindOrInsertAndPrepare(const FTextureInfo& Texture, const unsigned int iSlot);
+    const TextureConverter::TextureData& FindOrInsert(FTextureInfo& Texture);
+    const TextureConverter::TextureData& FindOrInsertAndPrepare(FTextureInfo& Texture, const unsigned int iSlot);
 
     /**
     Instead of checking what's actually bound, for our purposes it's enough to just check if someone else WANTED to bind something else.
@@ -32,7 +32,7 @@ protected:
     ID3D11DeviceContext& m_DeviceContext;
 
     TextureConverter m_TextureConverter;
-    std::unordered_map<long long, const TextureConverter::TextureData> m_Textures;
+    std::unordered_map<long long, TextureConverter::TextureData> m_Textures;
 
     std::array<decltype(FTextureInfo::CacheID), sm_iMaxSlots> m_PreparedIds;
     std::array<ID3D11ShaderResourceView*, sm_iMaxSlots> m_PreparedSRVs;

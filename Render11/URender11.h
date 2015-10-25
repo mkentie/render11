@@ -21,7 +21,7 @@ public:
     virtual FSceneNode* CreateMasterFrame(UViewport* Viewport, FVector Location, FRotator Rotation, FScreenBounds* Bounds) override;
 // 	virtual FSceneNode* CreateChildFrame(FSceneNode* Parent, FSpanBuffer* Span, ULevel* Level, INT iSurf, INT iZone, FLOAT Mirror, const FPlane& NearClip, const FCoords& Coords, FScreenBounds* Bounds) override;
 // 	virtual void FinishMasterFrame() override;
-//virtual void DrawWorld(FSceneNode* Frame) override;
+    virtual void DrawWorld(FSceneNode* Frame) override;
 // 	virtual void DrawActor(FSceneNode* Frame, AActor* Actor) override;
 // 	virtual UBOOL Project(FSceneNode* Frame, const FVector &V, FLOAT &ScreenX, FLOAT &ScreenY, FLOAT* Scale) override;
 // 	virtual UBOOL Deproject(FSceneNode* Frame, INT ScreenX, INT ScreenY, FVector& V) override;
