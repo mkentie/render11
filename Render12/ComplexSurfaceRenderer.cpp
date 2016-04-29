@@ -9,21 +9,21 @@ ComplexSurfaceRenderer::ComplexSurfaceRenderer(ID3D11Device& Device, ID3D11Devic
 ,m_VertexBuffer(Device, DeviceContext, 4096)
 ,m_IndexBuffer(Device, DeviceContext, DynamicGPUBufferHelpers::Fan2StripIndices(m_VertexBuffer.GetReserved()))
 {
-    ShaderCompiler Compiler(m_Device, L"Render11\\ComplexSurface.hlsl");
-    m_pVertexShader = Compiler.CompileVertexShader();
+    //ShaderCompiler Compiler(m_Device, L"Render12\\ComplexSurface.hlsl");
+    //m_pVertexShader = Compiler.CompileVertexShader();
 
-    const D3D11_INPUT_ELEMENT_DESC InputElementDescs[] =
-    {
-        { "Position", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "TexCoord", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "TexCoord", 1, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "BlendIndices", 0, DXGI_FORMAT_R32_UINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "BlendIndices", 1, DXGI_FORMAT_R32_UINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-    };
+    //const D3D11_INPUT_ELEMENT_DESC InputElementDescs[] =
+    //{
+    //    { "Position", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+    //    { "TexCoord", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+    //    { "TexCoord", 1, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+    //    { "BlendIndices", 0, DXGI_FORMAT_R32_UINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+    //    { "BlendIndices", 1, DXGI_FORMAT_R32_UINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+    //};
 
-    m_pInputLayout = Compiler.CreateInputLayout(InputElementDescs, _countof(InputElementDescs));
+    //m_pInputLayout = Compiler.CreateInputLayout(InputElementDescs, _countof(InputElementDescs));
 
-    m_pPixelShader = Compiler.CompilePixelShader();
+    //m_pPixelShader = Compiler.CompilePixelShader();
 }
 
 

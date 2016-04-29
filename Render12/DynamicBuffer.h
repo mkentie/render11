@@ -149,6 +149,7 @@ protected:
     ID3D11DeviceContext& m_DeviceContext;
 
     ComPtr<ID3D11Buffer> m_pBuffer;
+
     D3D11_MAPPED_SUBRESOURCE m_Mapping = {};
 
     size_t m_iReserved = 0;

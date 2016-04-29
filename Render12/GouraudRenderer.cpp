@@ -9,20 +9,20 @@ GouraudRenderer::GouraudRenderer(ID3D11Device& Device, ID3D11DeviceContext& Devi
 ,m_VertexBuffer(Device, DeviceContext, 4096)
 ,m_IndexBuffer(Device, DeviceContext, DynamicGPUBufferHelpers::Fan2StripIndices(m_VertexBuffer.GetReserved()))
 {
-    ShaderCompiler Compiler(m_Device, L"Render11\\Gouraud.hlsl");
-    m_pVertexShader = Compiler.CompileVertexShader();
+    //ShaderCompiler Compiler(m_Device, L"Render12\\Gouraud.hlsl");
+    //m_pVertexShader = Compiler.CompileVertexShader();
 
-    const D3D11_INPUT_ELEMENT_DESC InputElementDescs[] =
-    {
-        {"Position", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"Color", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"TexCoord", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"BlendIndices", 0, DXGI_FORMAT_R32_UINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0} //Todo make 8 bits, if necessary at all -> can't, hlsl doesn't support 8 bit data type
-    };
+    //const D3D11_INPUT_ELEMENT_DESC InputElementDescs[] =
+    //{
+    //    {"Position", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+    //    {"Color", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+    //    {"TexCoord", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+    //    {"BlendIndices", 0, DXGI_FORMAT_R32_UINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0} //Todo make 8 bits, if necessary at all -> can't, hlsl doesn't support 8 bit data type
+    //};
 
-    m_pInputLayout = Compiler.CreateInputLayout(InputElementDescs, _countof(InputElementDescs));
+    //m_pInputLayout = Compiler.CreateInputLayout(InputElementDescs, _countof(InputElementDescs));
 
-    m_pPixelShader = Compiler.CompilePixelShader();
+    //m_pPixelShader = Compiler.CompilePixelShader();
 }
 
 

@@ -8,16 +8,16 @@
 #include "DeviceState.h"
 #include "TextureCache.h"
 
-class UD3D11RenderDevice : public URenderDevice
+class UD3D12RenderDevice : public URenderDevice
 {
 #pragma warning(push, 1)
-    DECLARE_CLASS(UD3D11RenderDevice, URenderDevice, CLASS_Config)
+    DECLARE_CLASS(UD3D12RenderDevice, URenderDevice, CLASS_Config)
 #pragma warning(pop)
 
 public:
-    explicit UD3D11RenderDevice();
-    UD3D11RenderDevice(const UD3D11RenderDevice&) = delete;
-    UD3D11RenderDevice& operator=(const UD3D11RenderDevice&) = delete;
+    explicit UD3D12RenderDevice();
+    UD3D12RenderDevice(const UD3D12RenderDevice&) = delete;
+    UD3D12RenderDevice& operator=(const UD3D12RenderDevice&) = delete;
 
     void StaticConstructor();
 

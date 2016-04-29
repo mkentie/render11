@@ -43,9 +43,9 @@ protected:
     wchar_t m_szBuf[1024];
 };
 
-#define ThrowIfFail(hResult, pszMsg, ...) ThrowIfFailImpl(hResult, __FUNCTIONW__, pszMsg, __VA_ARGS__);
+#define ThrowIfFail(hResult, pszMsg, ...) ThrowIfFailImpl(hResult, __FUNCTIONW__, pszMsg, __VA_ARGS__)
 
-inline void ThrowIfFailImpl(const HRESULT hResult, const wchar_t* const pszFunction, const wchar_t* const pszMsg, ...)
+inline HRESULT ThrowIfFailImpl(const HRESULT hResult, const wchar_t* const pszFunction, const wchar_t* const pszMsg, ...)
 {
     if (FAILED(hResult))
     {
@@ -60,6 +60,8 @@ inline void ThrowIfFailImpl(const HRESULT hResult, const wchar_t* const pszFunct
         swprintf_s(szBuf2, L"Error in %s: %s (%x - %s)", pszFunction, szBuf1, Err.Error(), Err.ErrorMessage());
         throw WException(szBuf2);
     }
+
+    return hResult;
 }
 
 //Operator new/delete for SSE aligned data
@@ -71,7 +73,7 @@ public:
         return _aligned_malloc(s, std::alignment_of<__m128>::value);
     }
 
-    void operator delete(void* const p)
+        void operator delete(void* const p)
     {
         _aligned_free(p);
     }

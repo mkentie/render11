@@ -36,9 +36,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="URender11.h">
-      <Filter>Render\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="D3D11Drv.h">
       <Filter>RenderDevice\Header Files</Filter>
     </ClInclude>
@@ -84,11 +81,14 @@
     <ClInclude Include="ComplexSurfaceRenderer.h">
       <Filter>_Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="URender12.h">
+      <Filter>Render\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DynamicBuffer12.h">
+      <Filter>_Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="URender11.cpp">
-      <Filter>Render\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="D3D11Drv.cpp">
       <Filter>RenderDevice\Source Files</Filter>
     </ClCompile>
@@ -122,6 +122,9 @@
     <ClCompile Include="ComplexSurfaceRenderer.cpp">
       <Filter>_Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="URender12.cpp">
+      <Filter>Render\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Gouraud.hlsl">
@@ -135,8 +138,6 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Render11.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
+    <None Include="Render12.hlsli" />
   </ItemGroup>
 </Project>

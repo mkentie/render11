@@ -18,11 +18,18 @@ const TextureConverter::TextureData& TextureCache::FindOrInsert(FTextureInfo& Te
         if (Texture.bRealtimeChanged)
         {
             m_TextureConverter.Update(Texture, it->second);
-            Texture.bRealtimeChanged = 0; //Clear this flag (from other renderes)
+            Texture.bRealtimeChanged = 0; //Clear this flag (from other renderers)
         }
 
         return it->second;
     }
+	else if (Texture.Format == TEXF_RGBA7)
+	{
+
+		char buf[1000];
+		sprintf_s(buf, "%I64u\n", Texture.CacheID);
+		OutputDebugStringA(buf);
+	}
 
     TextureConverter::TextureData NewData = m_TextureConverter.Convert(Texture);
     const TextureConverter::TextureData& Data = m_Textures.emplace(Texture.CacheID, std::move(NewData)).first->second;
@@ -57,7 +64,8 @@ void TextureCache::BindTextures()
 
 void TextureCache::Flush()
 {
-    m_DeviceContext.PSSetShaderResources(0, sm_iMaxSlots, nullptr); //To be able to release textures
+	ID3D11ShaderResourceView* pEmpty[sm_iMaxSlots] = {};
+    m_DeviceContext.PSSetShaderResources(0, sm_iMaxSlots, pEmpty); //To be able to release textures
     m_Textures.clear();
 
     ResetDirtySlots();

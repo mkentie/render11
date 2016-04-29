@@ -1,6 +1,6 @@
-#include "Render11.hlsli"
+#include "Render12.hlsli"
 
-Texture2D TexDiffuse : register(t0);
+//Texture2D TexDiffuse : register(t0);
 
 struct STile
 {
@@ -32,14 +32,15 @@ VSOut VSMain(const STile Tile, const uint VertexID : SV_VertexID)
 
 float3 PSMain(const VSOut Input) : SV_Target
 {
-    if (Input.PolyFlags & PF_Masked)
-    {
-        clip(TexDiffuse.Sample(SamPoint, Input.TexCoord).a - 0.5f);
-    }
+    return float3(1,1,1);
+    //if (Input.PolyFlags & PF_Masked)
+    //{
+    //    clip(TexDiffuse.Sample(SamPoint, Input.TexCoord).a - 0.5f);
+    //}
 
-    const float3 Diffuse = TexDiffuse.Sample(SamLinear, Input.TexCoord).rgb;
+    //const float3 Diffuse = TexDiffuse.Sample(SamLinear, Input.TexCoord).rgb;
 
-    const float3 Color = Diffuse * Input.Color.rgb;
+    //const float3 Color = Diffuse * Input.Color.rgb;
 
-    return Color;
+    //return Color;
 }

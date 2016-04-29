@@ -4,9 +4,12 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <comdef.h>
+#include <dxgi1_4.h>
 #include <D3D11.h>
+#include <D3D12.h>
 #include <D3DCompiler.inl>
 #include <DirectXMath.h>
+#include "d3dx12.h"
 
 #include <wrl\client.h>
 using Microsoft::WRL::ComPtr;
@@ -19,8 +22,12 @@ using Microsoft::WRL::ComPtr;
 #include <string>
 #include <array>
 #include <functional>
+#include <queue>
 
+#pragma pack(push)
+#pragma pack(4)
 #include <Engine.h>
 #include <RenderPrivate.h>
+#pragma pack(pop)
 
 #pragma warning(pop)
