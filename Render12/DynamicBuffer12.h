@@ -82,24 +82,18 @@ public:
 
         Unmap();
         ComPtr<ID3D12Resource> pOldBuffer(std::move(m_pBuffer));
-        const size_t iOldReserved = m_iReserved;
+        const size_t iOldBufOffset = GetFirstNewElementIndex();
+        const size_t iOldBufSize = GetNumNewElements();
 
         Alloc(iNewSize);
         assert(m_pBuffer);
-        //assert(m_iReserved > iOldReserved);
 
         //Copy only the items that haven't been drawn yet
-        //m_CommandList.CopyBufferRegion(m_pBuffer.Get(), GetFirstElementForFrame()*sizeof(T), pOldBuffer.Get(), m_iCurrFrameIndex*iOldReserved*sizeof(T), m_iSize*sizeof(T));
-        //m_iSize = GetNumNewElements();
-        //m_iBatchStart = 0;
-        
-        //m_CommandList.CopyBufferRegion(m_pBuffer.Get(), 0, pOldBuffer.Get(), 0, iOldReserved*sizeof(T));
-        //m_CommandList.CopyBufferRegion(m_pBuffer.Get(), m_iReserved*sizeof(T), pOldBuffer.Get(), iOldReserved*sizeof(T), iOldReserved*sizeof(T));
-        
-        //m_CommandList.CopyBufferRegion(m_pBuffer.Get(), GetFirstElementForFrame()*sizeof(T), pOldBuffer.Get(), m_iCurrFrameIndex*iOldReserved*sizeof(T), m_iSize*sizeof(T));
-      
-        m_OldBuffers[m_iCurrFrameIndex].emplace_back(std::move(pOldBuffer));
+        m_CommandList.CopyBufferRegion(m_pBuffer.Get(), GetFirstElementForFrame()*sizeof(T), pOldBuffer.Get(), iOldBufOffset * sizeof(T), iOldBufSize * sizeof(T));
+        m_iSize = iOldBufSize;
+        m_iBatchStart = 0;
 
+        m_OldBuffers[m_iCurrFrameIndex].emplace_back(std::move(pOldBuffer));
     }
 
     void Alloc(const size_t iReserve)
@@ -123,15 +117,15 @@ public:
 
     void Map()
     {
-        //const D3D12_RANGE ReadRange = {};
-        m_pBuffer->Map(0, nullptr, reinterpret_cast<void**>(&m_pData));
+        const D3D12_RANGE ReadRange = {};
+        m_pBuffer->Map(0, &ReadRange, reinterpret_cast<void**>(&m_pData));
     }
 
     void Unmap()
     {
         const D3D12_RANGE WriteRange = {};
-        //TODO
-        m_pBuffer->Unmap(0, nullptr);
+        //Empty range means written everything, but we only unmap at end anyway
+        m_pBuffer->Unmap(0, &WriteRange);
     }
 
     ID3D12Device& m_Device;

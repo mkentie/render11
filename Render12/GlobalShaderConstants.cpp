@@ -23,8 +23,6 @@ GlobalShaderConstants::GlobalShaderConstants(ID3D12Device& Device, ID3D12Graphic
     Samplers[0].RegisterSpace = 0;
     Samplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-
-
     const D3D12_ROOT_SIGNATURE_FLAGS RootSignatureFlags =
         D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
         D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |

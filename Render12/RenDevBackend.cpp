@@ -100,12 +100,9 @@ void RenDevBackend::SetRes(const unsigned int iX, const unsigned int iY)
 
     m_pDepthStencil = nullptr;
 
-    IUnknown* presentQueue[] = { m_pCommandQueue.Get(), m_pCommandQueue.Get() };
-    uint32_t nodeMask[] = { 1, 1 };
-
     m_SwapChainDesc.Width = iX;
     m_SwapChainDesc.Height = iY;
-    ThrowIfFail(m_pSwapChain->ResizeBuffers1(m_SwapChainDesc.BufferCount, iX, iY, m_SwapChainDesc.Format, m_SwapChainDesc.Flags, nodeMask, presentQueue), L"Failed to resize swap chain (%u x %u).", iX, iY);
+    ThrowIfFail(m_pSwapChain->ResizeBuffers(m_SwapChainDesc.BufferCount, iX, iY, m_SwapChainDesc.Format, m_SwapChainDesc.Flags), L"Failed to resize swap chain (%u x %u).", iX, iY);
 
     CreateRenderTargetViews();
 }
@@ -163,24 +160,22 @@ void RenDevBackend::CreateRenderTargetViews()
 
 size_t RenDevBackend::NewFrame()
 {
-    assert(m_pDevice12);
+    assert(m_pSwapChain);
+    assert(m_pCommandList);
     assert(m_pRTVHeap);
     assert(m_pDSVHeap);
 
     //If we're in frame 0, wait for the previous frame 0 to complete, etc.
-    //if (m_pFence->GetCompletedValue() < m_iFrameFenceValues[m_iCurrentFrame]) //From MS example -> perf optimization?
-    //{
-    //    ThrowIfFail(m_pFence->SetEventOnCompletion(m_iFrameFenceValues[m_iCurrentFrame], m_FenceEvent.get()), L"Fence SetEventOnCompletion() failed.");
-    //    WaitForSingleObject(m_FenceEvent.get(), INFINITE);
-    //}
+    m_iCurrentFrame = m_pSwapChain->GetCurrentBackBufferIndex();
 
-    //m_iFrameFenceValues[m_iCurrentFrame] = m_iFrameFenceValue++;
+    if (m_pFence->GetCompletedValue() < m_iFrameFenceValues[m_iCurrentFrame]) //From MS example -> perf optimization?
+    {
+        ThrowIfFail(m_pFence->SetEventOnCompletion(m_iFrameFenceValues[m_iCurrentFrame], m_FenceEvent.get()), L"Fence SetEventOnCompletion() failed.");
+        WaitForSingleObject(m_FenceEvent.get(), INFINITE);
+    }
 
     ThrowIfFail(GetCommandAllocator().Reset(), L"Failed to reset command allocator %Iu.", m_iCurrentFrame);
     ThrowIfFail(m_pCommandList->Reset(&GetCommandAllocator(), nullptr), L"Failed to reset command list");
-
-    //m_commandList->RSSetViewports(1, &m_viewport);
-    //m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
     CD3DX12_RESOURCE_BARRIER RenderTargetResourceBarrier = CD3DX12_RESOURCE_BARRIER::Transition(&GetRenderTargetView(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
     m_pCommandList->ResourceBarrier(1, &RenderTargetResourceBarrier);
@@ -196,7 +191,6 @@ size_t RenDevBackend::NewFrame()
 
 void RenDevBackend::Present()
 {
-    assert(m_pDevice12);
     assert(m_pSwapChain);
     assert(m_pCommandList);
     assert(m_pCommandQueue);
@@ -208,58 +202,9 @@ void RenDevBackend::Present()
 
     const std::array<ID3D12CommandList*, 1> Lists = { m_pCommandList.Get() };
     m_pCommandQueue->ExecuteCommandLists(Lists.size(), Lists.data());
-//    m_pCommandQueue->Signal(m_pFence.Get(), m_iFrameFenceValues[m_iCurrentFrame]);
     m_pSwapChain->Present(0, 0);
-    //m_iCurrentFrame = (m_iCurrentFrame + 1) % m_iNumFrames;
 
-    // Signal and increment the fence value.
-    const UINT64 fence = m_iFrameFenceValues[m_iCurrentFrame];
-    m_pCommandQueue->Signal(m_pFence.Get(), fence);
-    //m_iFrameFenceValues[m_iCurrentFrame]++;
-
-    //// Wait until the previous frame is finished.
-    //if (m_pFence->GetCompletedValue() < fence)
-    //{
-    //    m_pFence->SetEventOnCompletion(fence, m_FenceEvent.get());
-    //    WaitForSingleObject(m_FenceEvent.get(), INFINITE);
-    //}
-
-    ////m_iCurrentFrame = (m_iCurrentFrame + 1) % m_iNumFrames;
-    //m_iCurrentFrame = m_pSwapChain->GetCurrentBackBufferIndex();
-
-
-    const UINT64 currentFenceValue = m_iFrameFenceValues[m_iCurrentFrame];
-    m_pCommandQueue->Signal(m_pFence.Get(), currentFenceValue);
-
-    // Update the frame index.
-    m_iCurrentFrame = m_pSwapChain->GetCurrentBackBufferIndex();
-
-    // If the next frame is not ready to be rendered yet, wait until it is ready.
-    if (m_pFence->GetCompletedValue() < m_iFrameFenceValues[m_iCurrentFrame])
-    {
-        m_pFence->SetEventOnCompletion(m_iFrameFenceValues[m_iCurrentFrame], m_FenceEvent.get());
-        WaitForSingleObjectEx(m_FenceEvent.get(), INFINITE, FALSE);
-    }
-
-    // Set the fence value for the next frame.
-    m_iFrameFenceValues[m_iCurrentFrame] = currentFenceValue + 1;
-
-    Sleep(10);
-}
-
-void RenDevBackend::SetViewport(const FSceneNode& SceneNode)
-{
-    if (m_Viewport.TopLeftX == static_cast<float>(SceneNode.XB) && m_Viewport.TopLeftY == static_cast<float>(SceneNode.YB) && m_Viewport.Width == SceneNode.FX && m_Viewport.Height == SceneNode.FY)
-    {
-        return;
-    }
-
-    m_Viewport.TopLeftX = static_cast<float>(SceneNode.XB);
-    m_Viewport.TopLeftY = static_cast<float>(SceneNode.YB);
-    m_Viewport.Width = SceneNode.FX;
-    m_Viewport.Height = SceneNode.FY;
-    m_Viewport.MinDepth = 0.0;
-    m_Viewport.MaxDepth = 1.0;
-
-    //m_pDeviceContext->RSSetViewports(1, &m_Viewport);
+    // Signal fence
+    m_pCommandQueue->Signal(m_pFence.Get(), m_iFrameFenceValue++);
+    m_iFrameFenceValues[m_iCurrentFrame] = m_iFrameFenceValue;
 }

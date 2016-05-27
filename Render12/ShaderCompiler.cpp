@@ -48,15 +48,3 @@ ShaderCompiler::CompiledShader ShaderCompiler::CompilePixelShader()
 {
     return CompileShader("PSMain", "ps_5_0");
 }
-
-//ComPtr<ID3D11InputLayout> ShaderCompiler::CreateInputLayout(const D3D11_INPUT_ELEMENT_DESC* InputElementDescs, const UINT NumElements)
-//{
-//    assert(m_pBlob);
-//
-//    ComPtr<ID3D11InputLayout> pInputLayout;
-//
-//    ThrowIfFail(m_Device.CreateInputLayout(InputElementDescs, NumElements, m_pBlob->GetBufferPointer(), m_pBlob->GetBufferSize(), &pInputLayout), L"Failed to create input layout from '%s'.", m_pszFileName);
-//    SetResourceNameW(pInputLayout, m_pszFileName);
-//
-//    return pInputLayout;
-//}

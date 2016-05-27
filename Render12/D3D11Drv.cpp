@@ -108,7 +108,6 @@ void UD3D12RenderDevice::Flush(const UBOOL /*bAllowPrecache*/)
 void UD3D12RenderDevice::SetSceneNode(FSceneNode* const pFrame)
 {
     assert(pFrame);
-    m_Backend.SetViewport(*pFrame);
     m_pGlobalShaderConstants->SetSceneNode(*pFrame);
 }
 

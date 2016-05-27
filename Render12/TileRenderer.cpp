@@ -44,38 +44,18 @@ TileRenderer::TileRenderer(ID3D12Device& Device, ID3D12RootSignature& RootSignat
 
 void TileRenderer::NewFrame(const size_t iFrameIndex)
 {
-//    m_InstanceBuffer.Clear();
     m_iNumDraws = 0;
     m_InstanceBuffer.NewFrame(iFrameIndex);
 }
 
 void TileRenderer::Bind()
 {
-    //assert(m_pInputLayout);
-    //assert(m_pVertexShader);
-    //assert(m_pPixelShader);
-
     m_CommandList.SetPipelineState(m_PipelineState.Get());
-    
     m_CommandList.IASetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-
-
-   /* m_DeviceContext.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-    m_DeviceContext.IASetInputLayout(m_pInputLayout.Get());
-
-    const UINT Strides[] = {sizeof(Tile)};
-    const UINT Offsets[] = {0};
-
-    m_DeviceContext.IASetVertexBuffers(0, 1, m_InstanceBuffer.GetAddressOf(), Strides, Offsets);
-    m_DeviceContext.VSSetShader(m_pVertexShader.Get(), nullptr, 0);
-    m_DeviceContext.PSSetShader(m_pPixelShader.Get(), nullptr, 0);*/
 }
 
 void TileRenderer::Draw()
 {
-    //assert(!IsMapped());
-    //m_DeviceContext.DrawInstanced(4, m_InstanceBuffer.GetNumNewElements(), 0, m_InstanceBuffer.GetFirstNewElementIndex()); //Just draw 4 non-existent vertices per quad, we're only interested in SV_VertexID.
-  //  m_InstanceBuffer.Grow(m_InstanceBuffer.GetReserved());
     m_CommandList.IASetVertexBuffers(0, 1, &m_InstanceBuffer.GetView());
     m_CommandList.DrawInstanced(4, m_InstanceBuffer.GetNumNewElements(), 0, m_InstanceBuffer.GetFirstNewElementIndex()); //Just draw 4 non-existent vertices per quad, we're only interested in SV_VertexID.
     m_iNumDraws++;
