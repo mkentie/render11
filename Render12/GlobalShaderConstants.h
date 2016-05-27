@@ -26,9 +26,9 @@ protected:
 
     //Vars for projection change check
     float m_fFov = 0.0f;
-    int m_iViewPortX = 0;
-    int m_iViewPortY = 0;
-    bool m_bDirty = false;
+
+    D3D12_VIEWPORT m_Viewport = {};
+    D3D12_RECT m_ScissorRect = {};
 
     ComPtr<ID3D12RootSignature> m_pRootSignature;
     ID3D12GraphicsCommandList& m_CommandList;

@@ -33,15 +33,15 @@ protected:
 
     ComPtr<IDXGIAdapter1> m_pAdapter;
     ComPtr<ID3D12Device> m_pDevice12;
-    DXGI_SWAP_CHAIN_DESC m_SwapChainDesc;
-    ComPtr<IDXGISwapChain> m_pSwapChain;
+    DXGI_SWAP_CHAIN_DESC1 m_SwapChainDesc;
+    ComPtr<IDXGISwapChain3> m_pSwapChain;
 
     ComPtr<ID3D12CommandQueue> m_pCommandQueue;
     std::array<ComPtr<ID3D12CommandAllocator>, m_iNumFrames> m_pCommandAllocators;
     ComPtr<ID3D12GraphicsCommandList> m_pCommandList;
 
     ComPtr<ID3D12Fence> m_pFence;
-    UINT64 m_iFrameFenceValue = 0;
+    //UINT64 m_iFrameFenceValue = 0;
     std::array<UINT64, m_iNumFrames> m_iFrameFenceValues = {};
     std::unique_ptr<std::remove_pointer<HANDLE>::type, decltype(&::CloseHandle)> m_FenceEvent = decltype(m_FenceEvent)(CreateEvent(nullptr, FALSE, FALSE, L"FenceEvent"), &CloseHandle);
 
@@ -61,6 +61,4 @@ protected:
     ComPtr<ID3D12DescriptorHeap> m_pDSVHeap;
     ComPtr<ID3D12Resource> m_pDepthStencil;
     D3D12_CPU_DESCRIPTOR_HANDLE m_DepthStencilView;
-
-    
 };

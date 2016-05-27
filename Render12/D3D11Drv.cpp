@@ -8,6 +8,7 @@ IMPLEMENT_CLASS(UD3D12RenderDevice);
 
 UD3D12RenderDevice::UD3D12RenderDevice()
 {
+
     URenderDevice::SpanBased = 0;
     URenderDevice::FullscreenOnly = 0;
     URenderDevice::SupportsFogMaps = 1;

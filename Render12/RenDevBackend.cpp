@@ -76,24 +76,20 @@ bool RenDevBackend::Init(const HWND hWnd)
     m_pFence->SetName(L"Frame sync fence");
 
     //Create swap chain
-    m_SwapChainDesc.BufferCount = 2;
-    m_SwapChainDesc.BufferDesc.Format = DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM;
-    m_SwapChainDesc.BufferDesc.RefreshRate.Numerator = 0;
-    m_SwapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
-    m_SwapChainDesc.BufferDesc.Height = 0;
-    m_SwapChainDesc.BufferDesc.Width = 0;
-    m_SwapChainDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER::DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-    m_SwapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING::DXGI_MODE_SCALING_UNSPECIFIED;
+    m_SwapChainDesc.BufferCount = m_iNumFrames;
+    m_SwapChainDesc.Width = 0;
+    m_SwapChainDesc.Height = 0;
+    m_SwapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     m_SwapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    m_SwapChainDesc.Flags = 0;
-    m_SwapChainDesc.OutputWindow = hWnd;
-    m_SwapChainDesc.Windowed = TRUE;
+    m_SwapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     m_SwapChainDesc.SampleDesc.Count = 1;
-    m_SwapChainDesc.SampleDesc.Quality = 0;
-    m_SwapChainDesc.SwapEffect = DXGI_SWAP_EFFECT::DXGI_SWAP_EFFECT_FLIP_DISCARD; //Todo: waitable swap chain IDXGISwapChain2::GetFrameLatencyWaitableObject
 
-    ThrowIfFail(pFactory->CreateSwapChain(m_pCommandQueue.Get(), &m_SwapChainDesc, &m_pSwapChain), L"Failed to create swap chain.");
-    SetResourceName(m_pSwapChain, "MainSwapChain");
+    ComPtr<IDXGISwapChain1> pSwapChain;
+    ThrowIfFail(pFactory->CreateSwapChainForHwnd(m_pCommandQueue.Get(), hWnd, &m_SwapChainDesc, nullptr, nullptr, &pSwapChain), L"Failed to create swap chain.");
+    SetResourceName(pSwapChain, "MainSwapChain");
+
+    ThrowIfFail(pSwapChain.As(&m_pSwapChain), L"Failed to cast swap chain.");
+    m_iCurrentFrame = m_pSwapChain->GetCurrentBackBufferIndex();
 
     return true;
 }
@@ -102,11 +98,14 @@ void RenDevBackend::SetRes(const unsigned int iX, const unsigned int iY)
 {
     assert(m_pSwapChain);
 
-    m_SwapChainDesc.BufferDesc.Width = iX;
-    m_SwapChainDesc.BufferDesc.Height = iY;
-
     m_pDepthStencil = nullptr;
-    ThrowIfFail(m_pSwapChain->ResizeBuffers(m_SwapChainDesc.BufferCount, m_SwapChainDesc.BufferDesc.Width, m_SwapChainDesc.BufferDesc.Height, m_SwapChainDesc.BufferDesc.Format, m_SwapChainDesc.Flags), L"Failed to resize swap chain (%u x %u).", iX, iY);
+
+    IUnknown* presentQueue[] = { m_pCommandQueue.Get(), m_pCommandQueue.Get() };
+    uint32_t nodeMask[] = { 1, 1 };
+
+    m_SwapChainDesc.Width = iX;
+    m_SwapChainDesc.Height = iY;
+    ThrowIfFail(m_pSwapChain->ResizeBuffers1(m_SwapChainDesc.BufferCount, iX, iY, m_SwapChainDesc.Format, m_SwapChainDesc.Flags, nodeMask, presentQueue), L"Failed to resize swap chain (%u x %u).", iX, iY);
 
     CreateRenderTargetViews();
 }
@@ -141,7 +140,7 @@ void RenDevBackend::CreateRenderTargetViews()
     //Depth stencil
     const D3D12_HEAP_PROPERTIES DSHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE::D3D12_HEAP_TYPE_DEFAULT);
 
-    const D3D12_RESOURCE_DESC DSResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT::DXGI_FORMAT_D32_FLOAT, m_SwapChainDesc.BufferDesc.Width, m_SwapChainDesc.BufferDesc.Height, 1, 0, 1, 0, D3D12_RESOURCE_FLAGS::D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+    const D3D12_RESOURCE_DESC DSResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT::DXGI_FORMAT_D32_FLOAT, m_SwapChainDesc.Width, m_SwapChainDesc.Height, 1, 0, 1, 0, D3D12_RESOURCE_FLAGS::D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 
     D3D12_CLEAR_VALUE DepthOptimizedClearValue = {};
     DepthOptimizedClearValue.Format = DXGI_FORMAT::DXGI_FORMAT_D32_FLOAT;
@@ -169,16 +168,19 @@ size_t RenDevBackend::NewFrame()
     assert(m_pDSVHeap);
 
     //If we're in frame 0, wait for the previous frame 0 to complete, etc.
-    if (m_pFence->GetCompletedValue() < m_iFrameFenceValues[m_iCurrentFrame]) //From MS example -> perf optimization?
-    {
-        ThrowIfFail(m_pFence->SetEventOnCompletion(m_iFrameFenceValues[m_iCurrentFrame], m_FenceEvent.get()), L"Fence SetEventOnCompletion() failed.");
-        WaitForSingleObject(m_FenceEvent.get(), INFINITE);
-    }
+    //if (m_pFence->GetCompletedValue() < m_iFrameFenceValues[m_iCurrentFrame]) //From MS example -> perf optimization?
+    //{
+    //    ThrowIfFail(m_pFence->SetEventOnCompletion(m_iFrameFenceValues[m_iCurrentFrame], m_FenceEvent.get()), L"Fence SetEventOnCompletion() failed.");
+    //    WaitForSingleObject(m_FenceEvent.get(), INFINITE);
+    //}
 
-    m_iFrameFenceValues[m_iCurrentFrame] = m_iFrameFenceValue++;
+    //m_iFrameFenceValues[m_iCurrentFrame] = m_iFrameFenceValue++;
 
     ThrowIfFail(GetCommandAllocator().Reset(), L"Failed to reset command allocator %Iu.", m_iCurrentFrame);
     ThrowIfFail(m_pCommandList->Reset(&GetCommandAllocator(), nullptr), L"Failed to reset command list");
+
+    //m_commandList->RSSetViewports(1, &m_viewport);
+    //m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
     CD3DX12_RESOURCE_BARRIER RenderTargetResourceBarrier = CD3DX12_RESOURCE_BARRIER::Transition(&GetRenderTargetView(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
     m_pCommandList->ResourceBarrier(1, &RenderTargetResourceBarrier);
@@ -206,10 +208,43 @@ void RenDevBackend::Present()
 
     const std::array<ID3D12CommandList*, 1> Lists = { m_pCommandList.Get() };
     m_pCommandQueue->ExecuteCommandLists(Lists.size(), Lists.data());
-    m_pCommandQueue->Signal(m_pFence.Get(), m_iFrameFenceValues[m_iCurrentFrame]);
-
+//    m_pCommandQueue->Signal(m_pFence.Get(), m_iFrameFenceValues[m_iCurrentFrame]);
     m_pSwapChain->Present(0, 0);
-    m_iCurrentFrame = (m_iCurrentFrame + 1) % m_iNumFrames;
+    //m_iCurrentFrame = (m_iCurrentFrame + 1) % m_iNumFrames;
+
+    // Signal and increment the fence value.
+    const UINT64 fence = m_iFrameFenceValues[m_iCurrentFrame];
+    m_pCommandQueue->Signal(m_pFence.Get(), fence);
+    //m_iFrameFenceValues[m_iCurrentFrame]++;
+
+    //// Wait until the previous frame is finished.
+    //if (m_pFence->GetCompletedValue() < fence)
+    //{
+    //    m_pFence->SetEventOnCompletion(fence, m_FenceEvent.get());
+    //    WaitForSingleObject(m_FenceEvent.get(), INFINITE);
+    //}
+
+    ////m_iCurrentFrame = (m_iCurrentFrame + 1) % m_iNumFrames;
+    //m_iCurrentFrame = m_pSwapChain->GetCurrentBackBufferIndex();
+
+
+    const UINT64 currentFenceValue = m_iFrameFenceValues[m_iCurrentFrame];
+    m_pCommandQueue->Signal(m_pFence.Get(), currentFenceValue);
+
+    // Update the frame index.
+    m_iCurrentFrame = m_pSwapChain->GetCurrentBackBufferIndex();
+
+    // If the next frame is not ready to be rendered yet, wait until it is ready.
+    if (m_pFence->GetCompletedValue() < m_iFrameFenceValues[m_iCurrentFrame])
+    {
+        m_pFence->SetEventOnCompletion(m_iFrameFenceValues[m_iCurrentFrame], m_FenceEvent.get());
+        WaitForSingleObjectEx(m_FenceEvent.get(), INFINITE, FALSE);
+    }
+
+    // Set the fence value for the next frame.
+    m_iFrameFenceValues[m_iCurrentFrame] = currentFenceValue + 1;
+
+    Sleep(10);
 }
 
 void RenDevBackend::SetViewport(const FSceneNode& SceneNode)

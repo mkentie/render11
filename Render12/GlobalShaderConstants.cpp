@@ -5,7 +5,7 @@ GlobalShaderConstants::GlobalShaderConstants(ID3D12Device& Device, ID3D12Graphic
 :m_CommandList(CommandList)
 {
     std::array<CD3DX12_ROOT_PARAMETER, 1> Parameters;
-    Parameters[0].InitAsConstants(sizeof(PerFrame) / sizeof(int32_t), 0, 0, D3D12_SHADER_VISIBILITY::D3D12_SHADER_VISIBILITY_ALL); //TODO: only for pixel/vertex shader -> just OR-ing doesn't work
+    Parameters[0].InitAsConstants(sizeof(m_CBufPerFrame) / sizeof(int32_t), 0, 0, D3D12_SHADER_VISIBILITY::D3D12_SHADER_VISIBILITY_ALL); //TODO: only for pixel/vertex shader -> just OR-ing doesn't work
 
 
     std::array<D3D12_STATIC_SAMPLER_DESC, 1> Samplers;
@@ -38,6 +38,8 @@ GlobalShaderConstants::GlobalShaderConstants(ID3D12Device& Device, ID3D12Graphic
     ThrowIfFail(D3D12SerializeRootSignature(&RSDesc, D3D_ROOT_SIGNATURE_VERSION_1, &pSignature, &pError), L"Failed to serialize root signature.");
     ThrowIfFail(Device.CreateRootSignature(0, pSignature->GetBufferPointer(), pSignature->GetBufferSize(), __uuidof(m_pRootSignature), &m_pRootSignature), L"Failed to create root signature.");
     m_pRootSignature->SetName(L"The root signature");
+
+    m_Viewport.MaxDepth = 1.0;
 }
 
 void GlobalShaderConstants::SetSceneNode(const FSceneNode& SceneNode)
@@ -47,7 +49,7 @@ void GlobalShaderConstants::SetSceneNode(const FSceneNode& SceneNode)
     assert(reinterpret_cast<uintptr_t>(&m_CBufPerFrame.ProjectionMatrix) % 16 == 0);
 
     //TODO: we don't need any of the SceneNode precalculated values, so remove calculation from render.dll
-    if (SceneNode.Viewport->Actor->FovAngle == m_fFov && SceneNode.X == m_iViewPortX && SceneNode.Y == m_iViewPortY)
+    if (SceneNode.Viewport->Actor->FovAngle == m_fFov && SceneNode.FX == m_Viewport.Height && SceneNode.FY == m_Viewport.Width)
     {
         return;
     }
@@ -67,20 +69,18 @@ void GlobalShaderConstants::SetSceneNode(const FSceneNode& SceneNode)
     m_CBufPerFrame.ProjectionMatrix.r[1].m128_f32[1] *= -1.0f; //Flip Y
 
     m_fFov = SceneNode.Viewport->Actor->FovAngle;
-    m_iViewPortX = SceneNode.X;
-    m_iViewPortY = SceneNode.Y;
-
-    m_bDirty = true;
+    m_Viewport.Height = SceneNode.FY;
+    m_Viewport.Width = SceneNode.FX;
+    m_ScissorRect.right = SceneNode.X;
+    m_ScissorRect.bottom = SceneNode.Y;
 }
 
 void GlobalShaderConstants::Bind()
 {
     m_CommandList.SetGraphicsRootSignature(m_pRootSignature.Get());
-
-    if (m_bDirty)
-    {
-        m_CommandList.SetGraphicsRoot32BitConstants(0, sizeof(m_CBufPerFrame) / sizeof(int32_t), &m_CBufPerFrame, 0);
-    }
+    m_CommandList.SetGraphicsRoot32BitConstants(0, sizeof(m_CBufPerFrame) / sizeof(int32_t), &m_CBufPerFrame, 0);
+    m_CommandList.RSSetViewports(1, &m_Viewport);
+    m_CommandList.RSSetScissorRects(1, &m_ScissorRect);
 }
 
 
