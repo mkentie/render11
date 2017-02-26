@@ -1,13 +1,14 @@
 #include "stdafx.h"
 #include "TextureConverter.h"
 #include "Helpers.h"
+#include "TextureCache.h"
 
 void TextureConverter::ConvertedTextureData::Resize(const FTextureInfo& Texture, const IFormatConverter& FormatConverter)
 {
-    m_SubResourceData.clear();
     m_Mips.clear();
 
     m_SubResourceData.resize(Texture.NumMips);
+    m_Footprints.resize(Texture.NumMips);
 
     const bool bWantsBuffer = FormatConverter.WantsBuffer();
     if (bWantsBuffer)
@@ -22,9 +23,10 @@ void TextureConverter::ConvertedTextureData::Resize(const FTextureInfo& Texture,
         if (bWantsBuffer)
         {
             m_Mips[i].resize(UnrealMip.USize * UnrealMip.VSize);
-            m_SubResourceData[i].pSysMem = m_Mips[i].data();
+            m_SubResourceData[i].pData = m_Mips[i].data();
         }
-        m_SubResourceData[i].SysMemPitch = FormatConverter.GetStride(UnrealMip);
+        m_SubResourceData[i].RowPitch = FormatConverter.GetStride(UnrealMip);
+        m_SubResourceData[i].SlicePitch = 0;
     }
 }
 
@@ -66,47 +68,15 @@ void TextureConverter::FormatConverterP8::Convert(const FTextureInfo& Texture)
     }
 }
 
-TextureConverter::TextureConverter(ID3D11Device& Device, ID3D11DeviceContext& DeviceContext)
+TextureConverter::TextureConverter(ID3D12Device& Device, ID3D12GraphicsCommandList& CommandList, ID3D12DescriptorHeap& SRVDescriptorHeap)
 :m_Device(Device)
-,m_DeviceContext(DeviceContext)
+,m_CommandList(CommandList)
+,m_SRVDescriptorHeap(SRVDescriptorHeap)
 {
-
-    //Create placeholder texture
-    m_PlaceholderTexture.fMultU = 1.0f;
-    m_PlaceholderTexture.fMultV = 1.0f;
-
-    D3D11_TEXTURE2D_DESC TextureDesc;
-    TextureDesc.Width = 1;
-    TextureDesc.Height = 1;
-    TextureDesc.MipLevels = 1;
-    TextureDesc.ArraySize = 1;
-    TextureDesc.Format = DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM;
-    TextureDesc.SampleDesc.Count = 1;
-    TextureDesc.SampleDesc.Quality = 0;
-    TextureDesc.Usage = D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
-    TextureDesc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE;
-    TextureDesc.CPUAccessFlags = 0;
-    TextureDesc.MiscFlags = 0;
-
-    const uint32_t PlaceholderPixel = 0xff00ffff;
-    D3D11_SUBRESOURCE_DATA PlaceHolderData;
-    PlaceHolderData.pSysMem = &PlaceholderPixel;
-    PlaceHolderData.SysMemPitch = sizeof(uint32_t);
-
-    ThrowIfFail(m_Device.CreateTexture2D(&TextureDesc, &PlaceHolderData, &m_PlaceholderTexture.pTexture), L"Failed to create placeholder texture.");
-    SetResourceName(m_PlaceholderTexture.pTexture, "Placeholder texture");
-
-    D3D11_SHADER_RESOURCE_VIEW_DESC ShaderResourceViewDesc;
-    ShaderResourceViewDesc.Format = TextureDesc.Format;
-    ShaderResourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION::D3D11_SRV_DIMENSION_TEXTURE2D;
-    ShaderResourceViewDesc.Texture2D.MipLevels = 1;
-    ShaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
-
-    ThrowIfFail(m_Device.CreateShaderResourceView(m_PlaceholderTexture.pTexture.Get(), &ShaderResourceViewDesc, &m_PlaceholderTexture.pShaderResourceView), L"Failed to create placeholder texture SRV.");
-    SetResourceName(m_PlaceholderTexture.pShaderResourceView, "Placeholder texture");
+    //TODO: Create placeholder texture
 }
 
-TextureConverter::TextureData TextureConverter::Convert(const FTextureInfo& Texture) const
+TextureConverter::TextureData TextureConverter::Convert(const FTextureInfo& Texture)
 {
     IFormatConverter* const pConverter = m_FormatConverters[Texture.Format];
     if (pConverter == nullptr)
@@ -120,38 +90,106 @@ TextureConverter::TextureData TextureConverter::Convert(const FTextureInfo& Text
 
     TextureData OutputTexture;
 
-    D3D11_TEXTURE2D_DESC TextureDesc;
+    D3D12_RESOURCE_DESC TextureDesc;
+    TextureDesc.Dimension = D3D12_RESOURCE_DIMENSION::D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    TextureDesc.Alignment = 0;
     TextureDesc.Width = Texture.UClamp;
     TextureDesc.Height = Texture.VClamp;
-    TextureDesc.MipLevels = Texture.NumMips;
-    TextureDesc.ArraySize = 1;
+    TextureDesc.DepthOrArraySize = 1;
+    TextureDesc.MipLevels = static_cast<UINT16>(Texture.NumMips);
     TextureDesc.Format = pConverter->GetDXGIFormat();
     TextureDesc.SampleDesc.Count = 1;
     TextureDesc.SampleDesc.Quality = 0;
-    TextureDesc.Usage = bDynamic ? D3D11_USAGE::D3D11_USAGE_DEFAULT: D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
-    //TextureDesc.Usage = bDynamic ? D3D11_USAGE::D3D11_USAGE_DYNAMIC : D3D11_USAGE::D3D11_USAGE_IMMUTABLE;
-    TextureDesc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE;
-    TextureDesc.CPUAccessFlags =  0;
-    //TextureDesc.CPUAccessFlags = bDynamic ? D3D11_CPU_ACCESS_FLAG::D3D11_CPU_ACCESS_WRITE : 0;
-    TextureDesc.MiscFlags = 0;
+    TextureDesc.Layout = D3D12_TEXTURE_LAYOUT::D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    TextureDesc.Flags = D3D12_RESOURCE_FLAGS::D3D12_RESOURCE_FLAG_NONE;
 
     const wchar_t* const pszTexName = Texture.Texture ? Texture.Texture->GetName() : nullptr;
 
-    ThrowIfFail(m_Device.CreateTexture2D(&TextureDesc, m_ConvertedTextureData.GetSubResourceDataArray(), &OutputTexture.pTexture), L"Failed to create texture '%s'.", pszTexName);
+    const D3D12_HEAP_PROPERTIES HeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE::D3D12_HEAP_TYPE_DEFAULT);
+
+    ThrowIfFail(m_Device.CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE, &TextureDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, __uuidof(OutputTexture.pTexture), &OutputTexture.pTexture), L"Failed to create texture '%s'.", pszTexName);
     SetResourceNameW(OutputTexture.pTexture, pszTexName);
 
-    D3D11_SHADER_RESOURCE_VIEW_DESC ShaderResourceViewDesc;
-    ShaderResourceViewDesc.Format = TextureDesc.Format;
-    ShaderResourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION::D3D11_SRV_DIMENSION_TEXTURE2D;
-    ShaderResourceViewDesc.Texture2D.MipLevels = Texture.NumMips;
-    ShaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
+    UINT64 iUploadSize;
+    m_Device.GetCopyableFootprints(&TextureDesc, 0, TextureDesc.MipLevels, 0, m_ConvertedTextureData.GetFootprintArray(), nullptr, nullptr, &iUploadSize);
 
-    ThrowIfFail(m_Device.CreateShaderResourceView(OutputTexture.pTexture.Get(), &ShaderResourceViewDesc, &OutputTexture.pShaderResourceView), L"Failed to create SRV for '%s'.", pszTexName);
-    SetResourceNameW(OutputTexture.pShaderResourceView, pszTexName);
+    D3D12_RESOURCE_DESC BufferDesc;
+    BufferDesc.Dimension = D3D12_RESOURCE_DIMENSION::D3D12_RESOURCE_DIMENSION_BUFFER;
+    BufferDesc.Alignment = 0;
+    BufferDesc.Width = iUploadSize;
+    BufferDesc.Height = 1;
+    BufferDesc.DepthOrArraySize = 1;
+    BufferDesc.MipLevels = 1;
+    BufferDesc.Format = DXGI_FORMAT::DXGI_FORMAT_UNKNOWN;
+    BufferDesc.SampleDesc.Count = 1;
+    BufferDesc.SampleDesc.Quality = 0;
+    BufferDesc.Layout = D3D12_TEXTURE_LAYOUT::D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    BufferDesc.Flags = D3D12_RESOURCE_FLAGS::D3D12_RESOURCE_FLAG_NONE;
+
+    ComPtr<ID3D12Resource> pUploadHeap;
+    const D3D12_HEAP_PROPERTIES UploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE::D3D12_HEAP_TYPE_UPLOAD);
+    ThrowIfFail(m_Device.CreateCommittedResource(&UploadHeapProperties, D3D12_HEAP_FLAG_NONE, &BufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, __uuidof(pUploadHeap), &pUploadHeap), L"Failed to upload buffer '%s'.", pszTexName);
+    SetResourceNameW(pUploadHeap, pszTexName);
+
+    const D3D12_RANGE ReadRange = {};
+    void* pMappedData;
+    ThrowIfFail(pUploadHeap->Map(0, &ReadRange, &pMappedData), L"Failed to map upload heap.");
+
+    //Todo: optimize out for converted textures
+    for (size_t iMip = 0; iMip < Texture.NumMips; iMip++)
+    {
+        BYTE* pRowDst = static_cast<BYTE*>(pMappedData) + m_ConvertedTextureData.GetFootprintArray()[iMip].Offset;
+        const BYTE* pRowSrc = static_cast<const BYTE*>(m_ConvertedTextureData.GetSubResourceDataArray()[iMip].pData);
+        
+        for (size_t iRow = 0; iRow < m_ConvertedTextureData.GetFootprintArray()[iMip].Footprint.Height; iRow++)
+        {
+            memcpy(pRowDst, pRowSrc, m_ConvertedTextureData.GetSubResourceDataArray()[iMip].RowPitch);
+            pRowDst += m_ConvertedTextureData.GetFootprintArray()[iMip].Footprint.RowPitch;
+            pRowSrc += m_ConvertedTextureData.GetSubResourceDataArray()[iMip].RowPitch;
+        }
+    }
+
+    pUploadHeap->Unmap(0, nullptr);
+
+    for (size_t iMip = 0; iMip < Texture.NumMips; iMip++)
+    {
+        D3D12_TEXTURE_COPY_LOCATION LocationSource;
+        LocationSource.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        LocationSource.PlacedFootprint = m_ConvertedTextureData.GetFootprintArray()[iMip];
+        LocationSource.pResource = pUploadHeap.Get();
+
+        D3D12_TEXTURE_COPY_LOCATION LocationDest;
+        LocationDest.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        LocationDest.SubresourceIndex = iMip;
+        LocationDest.pResource = OutputTexture.pTexture.Get();
+
+        m_CommandList.CopyTextureRegion(&LocationDest, 0, 0, 0, &LocationSource, nullptr);
+    }
+
+    const auto SRVBarrier = CD3DX12_RESOURCE_BARRIER::Transition(OutputTexture.pTexture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    m_CommandList.ResourceBarrier(1, &SRVBarrier);
+    pUploadHeap.Detach();
+
+
+    
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC SRVDesc;
+    SRVDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    SRVDesc.Format = TextureDesc.Format;
+    SRVDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    SRVDesc.Texture2D.MipLevels = Texture.NumMips;
+    SRVDesc.Texture2D.MostDetailedMip = 0;
+    SRVDesc.Texture2D.PlaneSlice = 0;
+    SRVDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+    auto Handle = m_SRVDescriptorHeap.GetCPUDescriptorHandleForHeapStart();
+    Handle.ptr += m_Device.GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) * TextureCache::GlobalNumTextures;
+    m_Device.CreateShaderResourceView(OutputTexture.pTexture.Get(), &SRVDesc, Handle);
+
 
     OutputTexture.fMultU = 1.0f / (Texture.UClamp * Texture.UScale);
     OutputTexture.fMultV = 1.0f / (Texture.VClamp * Texture.VScale);
-
+    
     return OutputTexture;
 }
 
@@ -166,7 +204,7 @@ void TextureConverter::Update(const FTextureInfo& Source, TextureData& Dest) con
 
     for (int i = 0; i < Source.NumMips; i++)
     {
-        m_DeviceContext.UpdateSubresource(Dest.pTexture.Get(), i, nullptr, m_ConvertedTextureData.GetSubResourceDataSysMem(i), sizeof(DWORD)*Source.Mips[i]->USize, 0);
+//        m_DeviceContext.UpdateSubresource(Dest.pTexture.Get(), i, nullptr, m_ConvertedTextureData.GetSubResourceDataSysMem(i), sizeof(DWORD)*Source.Mips[i]->USize, 0);
 
         //D3D11_MAPPED_SUBRESOURCE Mapping;
         //m_DeviceContext.Map(Dest.pTexture.Get(), i, D3D11_MAP::D3D11_MAP_WRITE_DISCARD, 0, &Mapping);

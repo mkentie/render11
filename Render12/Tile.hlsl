@@ -1,6 +1,6 @@
 #include "Render12.hlsli"
 
-//Texture2D TexDiffuse : register(t0);
+Texture2D TexDiffuse : register(t0);
 
 struct STile
 {
@@ -38,9 +38,9 @@ float3 PSMain(const VSOut Input) : SV_Target
     //    clip(TexDiffuse.Sample(SamPoint, Input.TexCoord).a - 0.5f);
     //}
 
-    //const float3 Diffuse = TexDiffuse.Sample(SamLinear, Input.TexCoord).rgb;
+    const float3 Diffuse = TexDiffuse.Sample(SamLinear, Input.TexCoord).rgb;
 
     //const float3 Color = Diffuse * Input.Color.rgb;
 
-    //return Color;
+    return Diffuse;
 }

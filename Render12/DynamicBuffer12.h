@@ -124,7 +124,7 @@ public:
     void Unmap()
     {
         const D3D12_RANGE WriteRange = {};
-        //Empty range means written everything, but we only unmap at end anyway
+        //Empty range means written nothing, but we only unmap at end anyway
         m_pBuffer->Unmap(0, &WriteRange);
     }
 

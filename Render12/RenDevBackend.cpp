@@ -177,7 +177,7 @@ size_t RenDevBackend::NewFrame()
     ThrowIfFail(GetCommandAllocator().Reset(), L"Failed to reset command allocator %Iu.", m_iCurrentFrame);
     ThrowIfFail(m_pCommandList->Reset(&GetCommandAllocator(), nullptr), L"Failed to reset command list");
 
-    CD3DX12_RESOURCE_BARRIER RenderTargetResourceBarrier = CD3DX12_RESOURCE_BARRIER::Transition(&GetRenderTargetView(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    const CD3DX12_RESOURCE_BARRIER RenderTargetResourceBarrier = CD3DX12_RESOURCE_BARRIER::Transition(&GetRenderTargetView(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
     m_pCommandList->ResourceBarrier(1, &RenderTargetResourceBarrier);
 
     const float ClearColor[] = { 1.0f, 0.0f, 0.0f, 0.0f };
@@ -195,7 +195,7 @@ void RenDevBackend::Present()
     assert(m_pCommandList);
     assert(m_pCommandQueue);
 
-    CD3DX12_RESOURCE_BARRIER PresentResourceBarrier = CD3DX12_RESOURCE_BARRIER::Transition(&GetRenderTargetView(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+    const CD3DX12_RESOURCE_BARRIER PresentResourceBarrier = CD3DX12_RESOURCE_BARRIER::Transition(&GetRenderTargetView(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
     m_pCommandList->ResourceBarrier(1, &PresentResourceBarrier);
 
     ThrowIfFail(m_pCommandList->Close(), L"Failed to close command list.");
