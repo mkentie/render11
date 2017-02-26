@@ -30,21 +30,20 @@ public:
         float fMultU;
         float fMultV;
 
-        ComPtr<ID3D12Resource> pTexture;
+        ComPtr<ID3D11Texture2D> pTexture;
         ComPtr<ID3D11ShaderResourceView> pShaderResourceView;
     };
 
-    explicit TextureConverter(ID3D12Device& Device, ID3D12GraphicsCommandList& CommandList, ID3D12DescriptorHeap& SRVDescriptorHeap);
+    explicit TextureConverter(ID3D11Device& Device, ID3D11DeviceContext& DeviceContext);
     TextureConverter(const TextureConverter&) = delete;
     TextureConverter& operator=(const TextureConverter&) = delete;
 
-    TextureData Convert(const FTextureInfo& Texture);
+    TextureData Convert(const FTextureInfo& Texture) const;
     void Update(const FTextureInfo& Source, TextureData& Dest) const;
 
 protected:
-    ID3D12Device& m_Device;
-    ID3D12GraphicsCommandList& m_CommandList;
-    ID3D12DescriptorHeap& m_SRVDescriptorHeap;
+    ID3D11Device& m_Device;
+    ID3D11DeviceContext& m_DeviceContext;
 
     class IFormatConverter;
     /**
@@ -57,14 +56,13 @@ protected:
         void Resize(const FTextureInfo& Texture, const IFormatConverter& FormatConverter);
 
         PixelFormat* GetMipBuffer(const unsigned int iMipLevel) { return m_Mips[iMipLevel].data(); }
-        const D3D12_SUBRESOURCE_DATA* GetSubResourceDataArray() const { return m_SubResourceData.data(); }
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT* GetFootprintArray() { return m_Footprints.data(); }
-        void SetSubResourceDataSysMem(const unsigned int iMipLevel, void* const p) { m_SubResourceData[iMipLevel].pData = p; }
+        const D3D11_SUBRESOURCE_DATA* GetSubResourceDataArray() const { return m_SubResourceData.data(); }
+        const void* GetSubResourceDataSysMem(const unsigned int iMipLevel) const { return m_SubResourceData[iMipLevel].pSysMem; }
+		void SetSubResourceDataSysMem(const unsigned int iMipLevel, void* const p) { m_SubResourceData[iMipLevel].pSysMem = p; }
 
     private:
         std::vector<std::vector<PixelFormat>> m_Mips; //Scratch data, not required for all conversions
-        std::vector<D3D12_SUBRESOURCE_DATA> m_SubResourceData; //References to Unreal data or converted scratch data
-        std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> m_Footprints; //Footprints for copying to upload buffer
+        std::vector<D3D11_SUBRESOURCE_DATA> m_SubResourceData; //References to Unreal data or converted scratch data
     };
     ConvertedTextureData m_ConvertedTextureData;
 
@@ -117,7 +115,6 @@ protected:
         static const size_t sm_iBlockSizeInBytes = 8;
     };
 
-    ComPtr<ID3D12Resource> m_pUploadHeap;
     FormatConverterIdentity m_FormatConverterIdentity = FormatConverterIdentity(m_ConvertedTextureData);
     FormatConverterP8 m_FormatConverterP8 = FormatConverterP8(m_ConvertedTextureData);
     FormatConverterDXT m_FormatConverterDXT = FormatConverterDXT(m_ConvertedTextureData);

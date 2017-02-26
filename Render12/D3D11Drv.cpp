@@ -52,7 +52,7 @@ UBOOL UD3D12RenderDevice::Init(UViewport* const pInViewport, const INT iNewX, co
 
         m_pGlobalShaderConstants = std::make_unique<GlobalShaderConstants>(Device, CommandList);
        // m_pDeviceState = std::make_unique<DeviceState>(Device, DeviceContext);
-        m_pTextureCache = std::make_unique<TextureCache>(Device, CommandList);
+       // m_pTextureCache = std::make_unique<TextureCache>(Device, DeviceContext);
         m_pTileRenderer = std::make_unique<TileRenderer>(Device, m_pGlobalShaderConstants->GetRootSignature(), CommandList);
        // m_pGouraudRenderer = std::make_unique<GouraudRenderer>(Device, DeviceContext);
        // m_pComplexSurfaceRenderer = std::make_unique<ComplexSurfaceRenderer>(Device, DeviceContext);
@@ -119,7 +119,6 @@ void UD3D12RenderDevice::Lock(const FPlane /*FlashScale*/, const FPlane /*FlashF
     m_pTileRenderer->NewFrame(iFrameIndex);
     //m_pGouraudRenderer->NewFrame();
     //m_pComplexSurfaceRenderer->NewFrame();
-    m_pGlobalShaderConstants->Bind();
 }
 
 void UD3D12RenderDevice::Unlock(const UBOOL bBlit)
@@ -142,8 +141,9 @@ void UD3D12RenderDevice::Render()
      //   return;
     }
 
+    m_pGlobalShaderConstants->Bind();
     //m_pDeviceState->Bind();
-   
+    //m_pTextureCache->BindTextures();
 
     if (m_pTileRenderer->InBatch())
     {
@@ -151,8 +151,6 @@ void UD3D12RenderDevice::Render()
         m_pTileRenderer->Bind();
         m_pTileRenderer->Draw();
     }
-
-    m_pTextureCache->BindTextures();
 
 
     //if (m_pGouraudRenderer->IsMapped())
@@ -349,7 +347,7 @@ void UD3D12RenderDevice::DrawTile(FSceneNode* const /*pFrame*/, FTextureInfo& In
     //}
 
     //m_pDeviceState->PrepareBlendState(BlendState);
-    m_pTextureCache->FindOrInsertAndPrepare(Info, 0);
+    //m_pTextureCache->FindOrInsertAndPrepare(Info, 0);
 
     if (!m_pTileRenderer->InBatch())
     {

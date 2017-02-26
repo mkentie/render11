@@ -6,7 +6,7 @@ class TextureCache
 public:
     static const unsigned int sm_iMaxSlots = 2; //Maximum texture slot managed by the cache
 
-    explicit TextureCache(ID3D12Device& Device, ID3D12GraphicsCommandList& CommandList);
+    explicit TextureCache(ID3D11Device& Device, ID3D11DeviceContext& DeviceContext);
     TextureCache(const TextureCache&) = delete;
     TextureCache& operator=(const TextureCache&) = delete;
 
@@ -26,19 +26,13 @@ public:
 
     void PrintSizeHistogram(UCanvas& c) const;
 
-    static unsigned int GlobalNumTextures;
-
 protected:
     void ResetDirtySlots();
 
-    ID3D12Device& m_Device;
-    ID3D12GraphicsCommandList& m_CommandList;
+    ID3D11DeviceContext& m_DeviceContext;
 
-    ComPtr<ID3D12DescriptorHeap> m_pSRVDescriptorHeap;
-    std::unique_ptr<TextureConverter> m_pTextureConverter; //pointer because it can only be created once srv descriptor heap exists -> TODO remove reliance on heap
+    TextureConverter m_TextureConverter;
     std::unordered_map<long long, TextureConverter::TextureData> m_Textures;
-
-    
 
     std::array<decltype(FTextureInfo::CacheID), sm_iMaxSlots> m_PreparedIds;
     std::array<ID3D11ShaderResourceView*, sm_iMaxSlots> m_PreparedSRVs;

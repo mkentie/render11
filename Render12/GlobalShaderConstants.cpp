@@ -4,12 +4,9 @@
 GlobalShaderConstants::GlobalShaderConstants(ID3D12Device& Device, ID3D12GraphicsCommandList& CommandList)
 :m_CommandList(CommandList)
 {
-    std::array<CD3DX12_DESCRIPTOR_RANGE, 1> Ranges;
-    Ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-
-    std::array<CD3DX12_ROOT_PARAMETER, 2> Parameters;
+    std::array<CD3DX12_ROOT_PARAMETER, 1> Parameters;
     Parameters[0].InitAsConstants(sizeof(m_CBufPerFrame) / sizeof(int32_t), 0, 0, D3D12_SHADER_VISIBILITY::D3D12_SHADER_VISIBILITY_ALL); //TODO: only for pixel/vertex shader -> just OR-ing doesn't work
-    Parameters[1].InitAsDescriptorTable(Ranges.size(), Ranges.data(), D3D12_SHADER_VISIBILITY_PIXEL);
+
 
     std::array<D3D12_STATIC_SAMPLER_DESC, 1> Samplers;
     Samplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
