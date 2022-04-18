@@ -1,0 +1,9 @@
+[Public]
+Object=(Name=Render11.D3D11RenderDevice,Class=Class,MetaClass=Engine.RenderDevice,Autodetect=)
+Preferences=(Caption="Rendering",Parent="Advanced Options")
+Preferences=(Caption="Direct3D 11 support",Parent="Rendering",Class=Render11.D3D11RenderDevice,Immediate=True)
+
+[D3D11RenderDevice]
+ClassCaption="Direct3D 11 Support"
+AskInstalled=Do you want to use Direct3D 11?
+AskUse=
