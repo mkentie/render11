@@ -17,6 +17,7 @@ bld/
 [Oo]bj/
 games/
 _work/
+.vs/
 
 # Roslyn cache directories
 *.ide/
@@ -67,7 +68,6 @@ ipch/
 *.aps
 *.ncb
 *.opensdf
-*.opendb
 *.sdf
 *.cachefile
 

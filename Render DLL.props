@@ -10,6 +10,7 @@
     <ClCompile>
       <AdditionalIncludeDirectories>../games/$(GAMENAME)/render/inc;../games/$(GAMENAME)/engine/inc;../games/$(GAMENAME)/core/inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PROJECTNAME=L"RENDER11";_REALLY_WANT_DEBUG;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <StructMemberAlignment>4Bytes</StructMemberAlignment>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
       <DisableSpecificWarnings>4291;4373</DisableSpecificWarnings>
       <WarningLevel>Level4</WarningLevel>
@@ -19,10 +20,9 @@
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <CompileAsManaged>false</CompileAsManaged>
       <CompileAsWinRT>false</CompileAsWinRT>
-      <EnforceTypeConversionRules>true</EnforceTypeConversionRules>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>../games/$(GAMENAME)/render/lib/render.lib;../games/$(GAMENAME)/engine/lib/engine.lib;../games/$(GAMENAME)/core/lib/core.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>../games/$(GAMENAME)/engine/lib/engine.lib;../games/$(GAMENAME)/core/lib/core.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>mkdir "$(GAMEDIR)\system\$(ProjectName)"
